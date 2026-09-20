@@ -132,7 +132,7 @@ class StructuredTranslationTests(unittest.TestCase):
         translated = translator.translate(source)
 
         self.assertIn("주문 시전을 배웠습니다.", translated)
-        self.assertIn("파이터 레벨", translated)
+        self.assertIn("전사 레벨", translated)
         self.assertIn("준비된 주문", translated)
         self.assertEqual(translated.count("<tr>"), 79)
         self.assertFalse(
@@ -148,7 +148,7 @@ class StructuredTranslationTests(unittest.TestCase):
         )
         translated = translator.translate(source)
 
-        self.assertIn("파이터 레벨", translated)
+        self.assertIn("전사 레벨", translated)
         self.assertIn("Spells Prepared", translated)
         self.assertTrue(translator.warnings)
 

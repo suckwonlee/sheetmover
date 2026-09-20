@@ -4,10 +4,10 @@ import unittest
 from pathlib import Path
 
 from sheet_mover.translator import (
-    TranslationError,
     Translator,
     protect_text,
     restore_text,
+    mechanical_tokens,
 )
 
 
@@ -26,17 +26,15 @@ class SmartFakeClient:
     def __init__(self, transform):
         self.transform = transform
         self.kwargs = None
+        self.seen = []
 
     def chat(self, **kwargs):
         self.kwargs = kwargs
         payload = json.loads(kwargs["messages"][-1]["content"])
-        translated = self.transform(payload["source"])
-        return _Response(
-            json.dumps(
-                {"translation": translated},
-                ensure_ascii=False,
-            )
-        )
+        source = payload["source"]
+        self.seen.append(source)
+        translated = self.transform(source)
+        return _Response(json.dumps({"translation": translated}, ensure_ascii=False))
 
 
 class ProtectedTokenTests(unittest.TestCase):
@@ -47,7 +45,7 @@ class ProtectedTokenTests(unittest.TestCase):
         glossary.write_text("{}", encoding="utf-8")
         return Translator(glossary_path=glossary, client=client)
 
-    def test_protect_restore_round_trip(self):
+    def test_legacy_protect_restore_round_trip_still_available(self):
         source = (
             '<p class="x">Deal 1d6 + 3 damage.</p>'
             ' <strong>Range 30</strong> [[1d20+5]]'
@@ -56,63 +54,39 @@ class ProtectedTokenTests(unittest.TestCase):
         self.assertNotIn("<p", protected)
         self.assertNotIn("1d6", protected)
         self.assertNotIn("[[1d20+5]]", protected)
-        self.assertEqual(
-            restore_text(protected, replacements),
-            source,
-        )
+        self.assertEqual(restore_text(protected, replacements), source)
 
-    def test_translation_preserves_html_numbers_dice_exactly(self):
-        source = (
-            '<p class="characters-statblock" style="font-family: Roboto Condensed;">'
-            'Humans gain +1 and deal 1d6 damage.</p>'
-        )
+    def test_live_translation_keeps_numbers_and_dice_visible(self):
+        source = '<p>Deal 1d6 + 3 damage at 30 feet.</p>'
 
         client = SmartFakeClient(
-            lambda value: value.replace(
-                "Humans gain ",
-                "인간은 ",
-            ).replace(
-                " and deal ",
-                "을 얻고 ",
-            ).replace(
-                " damage.",
-                " 피해를 줍니다.",
-            )
+            lambda value: value.replace("Deal", "가함").replace(
+                "damage at", "피해를 사거리"
+            ).replace("feet.", "피트에서 줍니다.")
         )
-
         result = self._translator(client).translate(source)
 
-        self.assertIn(
-            '<p class="characters-statblock" style="font-family: Roboto Condensed;">',
-            result,
+        self.assertEqual(mechanical_tokens(source), mechanical_tokens(result))
+        self.assertTrue(client.seen)
+        joined = "\n".join(client.seen)
+        self.assertIn("1d6", joined)
+        self.assertIn("+ 3", joined)
+        self.assertIn("30", joined)
+        self.assertNotIn("__SHEETMOVER_PROTECTED_", joined)
+
+    def test_roll20_formula_is_still_protected(self):
+        source = "Roll [[1d20+5]] and deal 1d6 damage."
+
+        client = SmartFakeClient(
+            lambda value: value.replace("Roll", "굴리고").replace(
+                "and deal", "그리고"
+            ).replace("damage.", "피해를 줍니다.")
         )
-        self.assertIn("</p>", result)
-        self.assertIn("+1", result)
+        result = self._translator(client).translate(source)
+
+        self.assertIn("[[1d20+5]]", result)
         self.assertIn("1d6", result)
-
-    def test_changed_placeholder_falls_back_to_fragment_translation(self):
-        source = "<p>Deal 1d6 damage.</p>"
-
-        def transform(value):
-            if "__SHEETMOVER_PROTECTED_" in value:
-                # Simulate the real Qwen failure: placeholder corruption.
-                return value.replace(
-                    "__SHEETMOVER_PROTECTED_0000__",
-                    "__BROKEN__",
-                )
-
-            # Fallback receives only plain English fragments; protected HTML and
-            # dice never reach the model.
-            if value == "Deal":
-                return "가함"
-            if value == "damage.":
-                return "피해."
-            return value
-
-        client = SmartFakeClient(transform)
-        result = self._translator(client).translate(source)
-
-        self.assertEqual(result, "<p>가함 1d6 피해.</p>")
+        self.assertTrue(any("__SHEETMOVER_PROTECTED_" in s for s in client.seen))
 
 
 if __name__ == "__main__":

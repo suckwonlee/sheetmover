@@ -261,7 +261,7 @@ class PreparationTests(unittest.TestCase):
                 client=FakeClient(error=TimeoutError("offline"))
             ).translate("A custom feature")
 
-    def test_dice_and_signed_numbers_are_hidden_from_model_and_restored(self):
+    def test_dice_and_signed_numbers_are_visible_and_validated(self):
         class InspectingClient:
             def __init__(self):
                 self.sources = []
@@ -272,8 +272,6 @@ class PreparationTests(unittest.TestCase):
                 )["source"]
                 self.sources.append(source)
 
-                # The model only translates plain text. Mechanical values must
-                # already be replaced by protected placeholders.
                 translated = (
                     source.replace("Deal ", "")
                     .replace(" damage", " 피해")
@@ -299,10 +297,10 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(first, "1d6 피해")
         self.assertEqual(second, "+3 보너스")
 
-        self.assertNotIn("1d6", client.sources[0])
-        self.assertNotIn("+3", client.sources[1])
-        self.assertIn("__SHEETMOVER_PROTECTED_", client.sources[0])
-        self.assertIn("__SHEETMOVER_PROTECTED_", client.sources[1])
+        self.assertIn("1d6", client.sources[0])
+        self.assertIn("+3", client.sources[1])
+        self.assertNotIn("__SHEETMOVER_PROTECTED_", client.sources[0])
+        self.assertNotIn("__SHEETMOVER_PROTECTED_", client.sources[1])
 
     def test_html_and_dice_preserved(self):
         class PlaceholderAwareClient:

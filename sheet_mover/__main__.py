@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -80,15 +81,38 @@ def main():
             "생략하면 현재 폴더에 sheet-result-<source_id>-<시각>.json으로 저장"
         ),
     )
+    parser.add_argument(
+        "--setup-google-glossary",
+        action="store_true",
+        help="현재 glossary.json으로 Google Cloud Translation v3 용어집을 생성/확인",
+    )
 
     args = parser.parse_args()
+
+    if args.setup_google_glossary:
+        from .google_glossary import setup_google_glossary
+
+        result = setup_google_glossary()
+        print(
+            json.dumps(
+                result,
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
 
     if args.dry_run:
         print(
             json.dumps(
                 {
                     "source": args.source,
-                    "model": "qwen3.5:9b",
+                    "translator": "google-cloud-translation-v3",
+                    "project": os.environ.get("SHEETMOVER_GOOGLE_PROJECT")
+                    or os.environ.get("GOOGLE_CLOUD_PROJECT"),
+                    "glossary_setup_command": (
+                        "python -m sheet_mover --setup-google-glossary"
+                    ),
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -170,12 +194,41 @@ def main():
             payload,
             args.output,
         )
-        print(
-            "[시트 이동기] 번역 완료. "
-            f"JSON 결과를 저장했습니다: {saved_path}",
-            file=sys.stderr,
-            flush=True,
-        )
+        summary = payload.get("translation_summary") or {}
+        preserved_count = int(summary.get("original_preserved_count") or 0)
+        if summary.get("status") == "partial" or preserved_count:
+            print(
+                "[시트 이동기] 번역 부분 완료. "
+                f"원문 유지 {preserved_count}개. "
+                f"JSON 결과를 저장했습니다: {saved_path}",
+                file=sys.stderr,
+                flush=True,
+            )
+            preserved = summary.get("original_preserved") or []
+            if preserved:
+                print(
+                    "[시트 이동기] 원문 유지 항목:",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                for item in preserved:
+                    if not isinstance(item, dict):
+                        continue
+                    preview = str(item.get("source_preview") or "").strip()
+                    reason = str(item.get("reason") or "").strip()
+                    detail = preview if not reason else f"{preview} ({reason})"
+                    print(
+                        f"  - {detail}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+        else:
+            print(
+                "[시트 이동기] 번역 완료. "
+                f"JSON 결과를 저장했습니다: {saved_path}",
+                file=sys.stderr,
+                flush=True,
+            )
         print(
             json.dumps(
                 payload,

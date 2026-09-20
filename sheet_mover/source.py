@@ -23,6 +23,28 @@ ABILITIES = {
 }
 
 
+SKILL_SUBTYPES = {
+    "acrobatics",
+    "animal-handling",
+    "arcana",
+    "athletics",
+    "deception",
+    "history",
+    "insight",
+    "intimidation",
+    "investigation",
+    "medicine",
+    "nature",
+    "perception",
+    "performance",
+    "persuasion",
+    "religion",
+    "sleight-of-hand",
+    "stealth",
+    "survival",
+}
+
+
 def source_character_id(url):
     parsed = urlparse(url)
     match = re.fullmatch(r"/characters/(\d+)/?", parsed.path)
@@ -122,6 +144,20 @@ def _normalize_class(entry):
 
     name = str(definition.get("name") or "")
     subclass_name = str(subclass.get("name") or "")
+
+    spellcasting_ability_id = subclass.get("spellCastingAbilityId")
+    if spellcasting_ability_id is None:
+        spellcasting_ability_id = definition.get("spellCastingAbilityId")
+
+    # D&D Beyond can keep the spell-slot progression on the base class while
+    # the actual spellcasting ability lives on the selected subclass
+    # (for example Fighter -> Eldritch Knight).
+    spell_rules = deepcopy(
+        subclass.get("spellRules")
+        or definition.get("spellRules")
+        or {}
+    )
+
     return {
         "source_id": str(entry.get("id") or definition.get("id") or ""),
         "definition_id": str(definition.get("id") or ""),
@@ -129,7 +165,14 @@ def _normalize_class(entry):
         "original_name": name,
         "level": _number(entry.get("level")),
         "hit_die": _number(definition.get("hitDice")),
-        "spellcasting_ability_id": definition.get("spellCastingAbilityId"),
+        "spellcasting_ability_id": spellcasting_ability_id,
+        "spellcasting_ability_name": ABILITIES.get(spellcasting_ability_id),
+        "spell_rules": spell_rules,
+        "can_cast_spells": bool(
+            subclass.get("canCastSpells")
+            if subclass.get("canCastSpells") is not None
+            else definition.get("canCastSpells", False)
+        ),
         "subclass_id": str(subclass.get("id") or ""),
         "subclass_name": subclass_name,
         "original_subclass_name": subclass_name,
@@ -159,6 +202,12 @@ def _normalize_inventory_item(entry, kind="equipment"):
         range=deepcopy(definition.get("range")),
         properties=deepcopy(definition.get("properties") or []),
     )
+    for prop in item.get("properties", []):
+        if not isinstance(prop, dict):
+            continue
+        name = prop.get("name")
+        if isinstance(name, str) and name and not prop.get("original_name"):
+            prop["original_name"] = name
     return item
 
 
@@ -184,6 +233,12 @@ def _normalize_spell(entry, source_kind="spell"):
         save_dc_ability_id=definition.get("saveDcAbilityId"),
         attack_type=definition.get("attackType"),
         damage_effect=deepcopy(definition.get("damageEffect")),
+        counts_as_known_spell=entry.get("countsAsKnownSpell"),
+        spellcasting_ability_id=entry.get("spellCastingAbilityId"),
+        cast_only_as_ritual=entry.get("castOnlyAsRitual"),
+        ritual_casting_type=entry.get("ritualCastingType"),
+        restriction=entry.get("restriction"),
+        display_as_attack=entry.get("displayAsAttack"),
     )
     return item
 
@@ -237,6 +292,155 @@ def _proficiency_label(modifier):
     if modifier.get("type") == "expertise":
         return f"{label} (expertise)"
     return str(label)
+
+
+
+def _active_class_feature_entries(character_class):
+    """Return only class features that belong on the current character sheet."""
+    if not isinstance(character_class, dict):
+        return []
+
+    class_level = _number(character_class.get("level"))
+    active = []
+
+    for entry in _list(character_class.get("classFeatures")):
+        definition = _dict(_dict(entry).get("definition") or entry)
+        required_level = _number(definition.get("requiredLevel"))
+
+        if definition.get("hideInSheet") is True:
+            continue
+
+        if (
+            class_level is None
+            or required_level is None
+            or required_level <= class_level
+        ):
+            active.append(entry)
+
+    return active
+
+
+def _granted_feat_ids(definition):
+    result = set()
+    for grant in _list(_dict(definition).get("grantedFeats")):
+        for feat_id in _list(_dict(grant).get("featIds")):
+            if feat_id not in (None, ""):
+                result.add(str(feat_id))
+    return result
+
+
+def _selected_feat_ids(data):
+    """Resolve feats that are actually selected/granted on the sheet.
+
+    D&D Beyond's top-level `feats` array can contain package/adventure helper
+    feats that are not displayed on the character sheet.  A real sheet feat is
+    anchored by a selected choice or by an active race/background/class grant.
+    """
+    feat_entries = _list(data.get("feats"))
+    feat_by_id = {}
+
+    for entry in feat_entries:
+        definition = _dict(_dict(entry).get("definition") or entry)
+        feat_id = definition.get("id")
+        if feat_id not in (None, ""):
+            feat_by_id[str(feat_id)] = entry
+
+    all_feat_ids = set(feat_by_id)
+    selected = set()
+
+    # Explicit feat choices (race/class/etc.).
+    for group in _dict(data.get("choices")).values():
+        for choice in _list(group):
+            option_value = _dict(choice).get("optionValue")
+            if option_value not in (None, "") and str(option_value) in all_feat_ids:
+                selected.add(str(option_value))
+
+    # Direct grants from the current background.
+    background_definition = _dict(_dict(data.get("background")).get("definition"))
+    selected.update(_granted_feat_ids(background_definition))
+
+    # Direct grants from visible race traits.
+    for trait in _list(_dict(data.get("race")).get("racialTraits")):
+        definition = _dict(_dict(trait).get("definition") or trait)
+        if definition.get("hideInSheet") is not True:
+            selected.update(_granted_feat_ids(definition))
+
+    # Direct grants from class features that the character has reached.
+    for character_class in _list(data.get("classes")):
+        for feature in _active_class_feature_entries(character_class):
+            definition = _dict(_dict(feature).get("definition") or feature)
+            selected.update(_granted_feat_ids(definition))
+
+    # A selected feat can itself grant another feat.
+    changed = True
+    while changed:
+        changed = False
+        for feat_id in tuple(selected):
+            entry = feat_by_id.get(feat_id)
+            if not entry:
+                continue
+            definition = _dict(_dict(entry).get("definition") or entry)
+            before = len(selected)
+            selected.update(_granted_feat_ids(definition))
+            if len(selected) != before:
+                changed = True
+
+    return selected
+
+
+def _background_supplies_ability_scores(data):
+    background_definition = _dict(_dict(data.get("background")).get("definition"))
+
+    for grant in _list(background_definition.get("grantedFeats")):
+        name = str(_dict(grant).get("name") or "").casefold()
+        if "ability score" in name:
+            return True
+
+    return False
+
+
+def _visible_racial_trait_entries(data):
+    """Match the traits D&D Beyond actually exposes on the sheet."""
+    result = []
+    background_has_asi = _background_supplies_ability_scores(data)
+
+    for entry in _list(_dict(data.get("race")).get("racialTraits")):
+        definition = _dict(_dict(entry).get("definition") or entry)
+
+        if definition.get("hideInSheet") is True:
+            continue
+
+        # 2024 backgrounds supply ability-score improvements. D&D Beyond keeps
+        # the legacy Variant Human initial-ASI definition in the raw payload,
+        # but it is not shown/applied on the resulting sheet.
+        if background_has_asi:
+            category_tags = {
+                str(_dict(category).get("tagName") or "")
+                for category in _list(definition.get("categories"))
+            }
+            if "__INITIAL_ASI" in category_tags:
+                continue
+
+        result.append(entry)
+
+    return result
+
+
+def _spell_slots_for_class_level(spell_rules, class_level):
+    rules = _dict(spell_rules)
+    rows = _list(rules.get("levelSpellSlots"))
+
+    if type(class_level) is not int or class_level < 0 or class_level >= len(rows):
+        return []
+
+    row = _list(rows[class_level])
+    return [
+        {
+            "level": index + 1,
+            "available": _number(value) or 0,
+        }
+        for index, value in enumerate(row)
+    ]
 
 
 def _collect_resources(*collections):
@@ -406,14 +610,35 @@ def normalize_character(data):
         )
         if subtype.endswith("-saving-throws") and label:
             sheet.saving_throw_proficiencies.append(label)
-        elif subtype.endswith("-skill") and label:
+        elif subtype in SKILL_SUBTYPES and label:
             sheet.skill_proficiencies.append(
                 {
                     "name": label,
+                    "original_name": label,
                     "subtype": subtype,
                     "type": modifier.get("type"),
+                    "source_group": modifier.get("source_group"),
+                    "component_id": modifier.get("componentId"),
+                    "is_granted": modifier.get("isGranted"),
                 }
             )
+
+    # Preserve sheet order while removing duplicate source modifiers.
+    sheet.saving_throw_proficiencies = list(
+        dict.fromkeys(sheet.saving_throw_proficiencies)
+    )
+    seen_skill_keys = set()
+    unique_skills = []
+    for skill in sheet.skill_proficiencies:
+        identity = (
+            skill.get("subtype"),
+            skill.get("type"),
+        )
+        if identity in seen_skill_keys:
+            continue
+        seen_skill_keys.add(identity)
+        unique_skills.append(skill)
+    sheet.skill_proficiencies = unique_skills
 
     for modifier in modifiers:
         modifier_type = str(modifier.get("type") or "")
@@ -490,6 +715,25 @@ def normalize_character(data):
             }
             for cls in sheet.classes
         ],
+        "class_spellcasting": [
+            {
+                "class_name": cls.get("name", ""),
+                "subclass_name": cls.get("subclass_name", ""),
+                "level": cls.get("level"),
+                "ability_id": cls.get("spellcasting_ability_id"),
+                "ability_name": cls.get("spellcasting_ability_name"),
+                "spell_rules": deepcopy(cls.get("spell_rules") or {}),
+                "slots_at_level": _spell_slots_for_class_level(
+                    cls.get("spell_rules"),
+                    cls.get("level"),
+                ),
+            }
+            for cls in sheet.classes
+            if (
+                cls.get("spellcasting_ability_id") is not None
+                or cls.get("spell_rules")
+            )
+        ],
         "race_movement": deepcopy(sheet.race.get("movement_source", {})),
         "pact_magic": deepcopy(data.get("pactMagic")),
         "spell_slots": deepcopy(data.get("spellSlots")),
@@ -539,38 +783,54 @@ def normalize_character(data):
             if item:
                 sheet.spells.append(item)
 
+    visible_racial_traits = _visible_racial_trait_entries(data)
+    selected_feat_ids = _selected_feat_ids(data)
+
+    raw_feats = _list(data.get("feats"))
+    if selected_feat_ids:
+        active_feats = [
+            entry
+            for entry in raw_feats
+            if str(
+                _dict(_dict(entry).get("definition") or entry).get("id")
+                or ""
+            )
+            in selected_feat_ids
+        ]
+    else:
+        # Conservative compatibility fallback for older/alternate payloads that
+        # do not expose choice/grant links.
+        active_feats = raw_feats
+
     feature_groups = [
-        (_list(_dict(data.get("race")).get("racialTraits")), "racial_trait"),
-        (_list(data.get("feats")), "feat"),
+        (visible_racial_traits, "racial_trait"),
+        (active_feats, "feat"),
     ]
+
     for character_class in _list(data.get("classes")):
-        if isinstance(character_class, dict):
-            class_level = _number(character_class.get("level"))
-            active_class_features = []
-
-            for entry in _list(character_class.get("classFeatures")):
-                definition = _dict(
-                    _dict(entry).get("definition") or entry
-                )
-                required_level = _number(
-                    definition.get("requiredLevel")
-                )
-
-                # D&D Beyond returns future class progression too. Only reached
-                # features belong to the current character sheet.
-                if (
-                    class_level is None
-                    or required_level is None
-                    or required_level <= class_level
-                ):
-                    active_class_features.append(entry)
-
+        active_class_features = _active_class_feature_entries(character_class)
+        if active_class_features:
             feature_groups.append(
                 (active_class_features, "class_feature")
             )
 
     background = sheet.background
-    if background.get("feature_name"):
+    selected_feat_names = {
+        str(_dict(_dict(entry).get("definition") or entry).get("name") or "")
+        for entry in active_feats
+    }
+
+    # Legacy backgrounds may have their own textual feature.  2024 backgrounds
+    # often expose a feat name here (e.g. Tough) with an empty description; the
+    # real sheet shows the feat in the Feats section, not a duplicate background
+    # feature.
+    if (
+        background.get("feature_name")
+        and (
+            background.get("feature_description")
+            or background.get("feature_name") not in selected_feat_names
+        )
+    ):
         sheet.features.append(
             {
                 "source_id": background.get("source_id", ""),
@@ -589,6 +849,31 @@ def normalize_character(data):
             item = _normalize_feature(entry, kind)
             if item:
                 sheet.features.append(item)
+
+    hidden_racial_names = [
+        str(_dict(_dict(entry).get("definition") or entry).get("name") or "")
+        for entry in _list(_dict(data.get("race")).get("racialTraits"))
+        if entry not in visible_racial_traits
+    ]
+    suppressed_feat_names = [
+        str(_dict(_dict(entry).get("definition") or entry).get("name") or "")
+        for entry in raw_feats
+        if entry not in active_feats
+    ]
+
+    if hidden_racial_names:
+        sheet.warnings.append(
+            "D&D Beyond 실제 시트에 표시되지 않는 종족 특성 "
+            f"{len(hidden_racial_names)}개를 제외했습니다: "
+            + ", ".join(hidden_racial_names[:8])
+        )
+
+    if suppressed_feat_names:
+        sheet.warnings.append(
+            "D&D Beyond 원본 feats 배열에는 있었지만 현재 시트에서 "
+            f"선택·부여되지 않은 feat {len(suppressed_feat_names)}개를 제외했습니다: "
+            + ", ".join(suppressed_feat_names[:8])
+        )
 
     # D&D Beyond can return stale/orphan actions whose componentId no
     # longer belongs to any active feature on the character.  Do not expose
@@ -668,16 +953,24 @@ def normalize_character(data):
         sheet.spells,
     )
 
-    # Spellcasting facts are preserved, while DC/attack bonus/slots are stage 2.
+    # Spellcasting source facts are preserved here. Final save DC / attack
+    # bonus still belong to stage 2, but the casting ability and slot
+    # progression must already match the actual D&D Beyond sheet.
+    class_spellcasting = deepcopy(
+        sheet.calculation_inputs.get("class_spellcasting") or []
+    )
     sheet.spellcasting = {
         "class_abilities": [
             {
-                "class_name": cls.get("name", ""),
-                "ability_id": cls.get("spellcasting_ability_id"),
+                "class_name": item.get("class_name", ""),
+                "subclass_name": item.get("subclass_name", ""),
+                "ability_id": item.get("ability_id"),
+                "ability_name": item.get("ability_name"),
             }
-            for cls in sheet.classes
-            if cls.get("spellcasting_ability_id") is not None
+            for item in class_spellcasting
+            if item.get("ability_id") is not None
         ],
+        "class_rules_source": class_spellcasting,
         "spell_slots_source": deepcopy(data.get("spellSlots")),
         "pact_magic_source": deepcopy(data.get("pactMagic")),
         "save_dc": None,

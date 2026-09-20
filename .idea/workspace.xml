@@ -5,27 +5,25 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/tests/test_active_class_features.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_batch_translation.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_bilingual_names.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_cli_output_save.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_glossary_hardlock.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_model_switch.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_ollama_translation.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_orphan_actions.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_preflight_hardening.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_protected_tokens.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_soft_single_fallback.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_structured_translation.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_translation_quality_regressions.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/google_glossary.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_google_translation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_no_hanja_translation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_sheet_semantics.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_translation_pipeline_final.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_translation_status.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/sheet_mover.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/sheet_mover.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/glossary.json" beforeDir="false" afterPath="$PROJECT_DIR$/glossary.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/__main__.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/__main__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/mover.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/mover.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/source.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/source.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/translator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/translator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_model_switch.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_ollama_translation.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/tests/test_preparation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_preparation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_protected_tokens.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_protected_tokens.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_structured_translation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_structured_translation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,15 +64,18 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "master",
-    "last_opened_file_path": "E:/sheet_mover/sheet_mover",
+    "last_opened_file_path": "E:/sheet_mover/tests",
     "nodejs_package_manager_path": "npm"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="E:\sheet_mover\sheet_mover" />
       <recent name="E:\sheet_mover\tests" />
+      <recent name="E:\sheet_mover\sheet_mover" />
       <recent name="E:\sheet_mover" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="E:\sheet_mover\sheet_mover" />
     </key>
   </component>
   <component name="SharedIndexes">
@@ -103,7 +104,15 @@
       <option name="project" value="LOCAL" />
       <updated>1789099657688</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1789123754118</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1789123754118</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
