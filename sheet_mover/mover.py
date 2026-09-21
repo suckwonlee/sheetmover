@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from urllib.parse import urlparse
 
 from .source import fetch_character, normalize_character, source_character_id
-from .translator import TranslationError, Translator
+from .hybrid_translator import TranslationError, Translator
 
 SOURCE_URL = "https://www.dndbeyond.com/characters/170892133"
 TRANSLATION_FALLBACK_WARNING_PREFIX = (
@@ -32,11 +32,23 @@ def translation_summary(translated):
                 item for item in preserved if isinstance(item, dict)
             ]
             count = len(preserved)
-            return {
+            summary = {
                 "status": "partial" if count else "complete",
                 "original_preserved_count": count,
                 "original_preserved": preserved,
             }
+            # Keep v15 diagnostics at the top level too, so a saved result can
+            # prove whether Google/Ollama were actually called without digging
+            # into the translated payload.
+            for key in (
+                "review_model",
+                "validator_version",
+                "translation_pipeline",
+                "review_stats",
+            ):
+                if key in embedded:
+                    summary[key] = embedded[key]
+            return summary
 
     # Backward compatibility for results produced before machine-readable
     # translation_summary existed.  These warnings already carry the reason
