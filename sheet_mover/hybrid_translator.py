@@ -634,11 +634,17 @@ class Translator(_base.Translator):
             return [Path(explicit)]
         root = Path(__file__).resolve().parent.parent
         try:
-            return sorted(
+            current = sorted(
+                (root / "results" / "current").glob("sheet-result-*.json"),
+                key=self._result_candidate_sort_key,
+                reverse=True,
+            )
+            legacy = sorted(
                 root.glob("sheet-result-*.json"),
                 key=self._result_candidate_sort_key,
                 reverse=True,
-            )[:24]
+            )
+            return (current + legacy)[:24]
         except OSError:
             return []
 

@@ -5,25 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/.sheetmover-google-translation-cache.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.sheetmover-ollama-review-cache.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage3.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage4.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20261006-120034.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/result_cleanup.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/result_store.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_browser.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_connection.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_payload.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_result_cleanup.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_roll20_connection.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage3_payload.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage4_results.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.sheetmover-google-translation-cache.json" beforeDir="false" afterPath="$PROJECT_DIR$/.sheetmover-google-translation-cache.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apply_stage4.py" beforeDir="false" afterPath="$PROJECT_DIR$/apply_stage4.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet-result-170892133-20261006-120034.json" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/__main__.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/__main__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/mover.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/mover.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_translation_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_translation_status.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/hybrid_translator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/hybrid_translator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_connection.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_connection.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_cli_output_save.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_cli_output_save.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_result_cleanup.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_result_cleanup.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,15 +57,15 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "master",
-    "last_opened_file_path": "E:/sheet_mover/tests",
+    "last_opened_file_path": "E:/sheet_mover",
     "nodejs_package_manager_path": "npm"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\sheet_mover" />
       <recent name="E:\sheet_mover\tests" />
       <recent name="E:\sheet_mover\sheet_mover" />
-      <recent name="E:\sheet_mover" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="E:\sheet_mover\sheet_mover" />
@@ -145,7 +137,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791259642695</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791262097070</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1791262097070</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

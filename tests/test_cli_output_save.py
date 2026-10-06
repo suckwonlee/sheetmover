@@ -18,6 +18,10 @@ class CliOutputSaveTests(unittest.TestCase):
             path.name,
             "sheet-result-170892133-20260911-163304.json",
         )
+        self.assertEqual(
+            path.as_posix(),
+            "results/current/sheet-result-170892133-20260911-163304.json",
+        )
 
     def test_success_payload_is_written_as_utf8_json(self):
         payload = {

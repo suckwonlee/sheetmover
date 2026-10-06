@@ -1,3 +1,4 @@
 playwright
 google-cloud-translate
 ollama>=0.6.2
+selenium>=4.20,<5

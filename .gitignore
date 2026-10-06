@@ -8,3 +8,9 @@ sheet-preview-*.json
 sheet-result-*.json
 sheet-partial-*.json
 output_archive/
+
+# Stage 4 local runtime data
+results/
+.roll20_chrome_profile/
+stage4_assets/
+*.stage4.bak

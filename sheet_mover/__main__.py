@@ -1,12 +1,14 @@
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from .mover import SOURCE_URL, run
 from .source import fetch_character, normalize_character
+from .result_store import ARCHIVE_DIR, default_result_path
 
 
 def _console_progress(percent, message):
@@ -31,9 +33,7 @@ def _default_output_path(payload, now=None):
     safe_source_id = "".join(
         ch for ch in source_id if ch.isalnum() or ch in ("-", "_")
     ) or "unknown"
-    return Path(
-        f"sheet-result-{safe_source_id}-{now:%Y%m%d-%H%M%S}.json"
-    )
+    return default_result_path(safe_source_id, now=now)
 
 
 def _save_success_payload(payload, output=None):
@@ -52,6 +52,11 @@ def _save_success_payload(payload, output=None):
         encoding="utf-8",
     )
     return path.resolve()
+
+
+def _source_id_from_source(source):
+    match = re.search(r"/characters/(\d+)", str(source or ""))
+    return match.group(1) if match else None
 
 
 def main():
@@ -78,7 +83,7 @@ def main():
         "--output",
         help=(
             "--cli 성공 결과를 저장할 JSON 경로. "
-            "생략하면 현재 폴더에 sheet-result-<source_id>-<시각>.json으로 저장"
+            "생략하면 results/current/에 sheet-result-<source_id>-<시각>.json으로 저장"
         ),
     )
     parser.add_argument(
@@ -86,8 +91,56 @@ def main():
         action="store_true",
         help="현재 glossary.json으로 Google Cloud Translation v3 용어집을 생성/확인",
     )
+    parser.add_argument(
+        "--roll20-check",
+        action="store_true",
+        help="Roll20 시트를 수정하지 않고 동명 캐릭터와 내부 ID만 확인",
+    )
+    parser.add_argument(
+        "--roll20-result",
+        help="Roll20 확인에 사용할 sheet-result JSON. 생략하면 source ID 기준 최신 정상 결과 사용",
+    )
+    parser.add_argument(
+        "--roll20-cdp-url",
+        default="http://127.0.0.1:9222",
+        help="Roll20 전용 Chrome의 CDP 주소",
+    )
 
     args = parser.parse_args()
+
+    if args.roll20_check:
+        from .roll20_connection import check_roll20_target
+
+        source_id = _source_id_from_source(args.source)
+        target, target_path = check_roll20_target(
+            result_path=args.roll20_result,
+            source_id=source_id,
+            cdp_url=args.roll20_cdp_url,
+            save=True,
+            on_progress=_console_progress,
+        )
+        print(
+            f"[시트 이동기] 대상 캐릭터: {target.character_name}",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
+            f"[시트 이동기] Roll20 Character ID: {target.roll20_character_id}",
+            file=sys.stderr,
+            flush=True,
+        )
+        if target_path:
+            print(
+                f"[시트 이동기] 연결 정보를 저장했습니다: {Path(target_path).resolve()}",
+                file=sys.stderr,
+                flush=True,
+            )
+        print(
+            "[시트 이동기] Roll20 시트 내용은 수정하지 않았습니다.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
 
     if args.setup_google_glossary:
         from .google_glossary import setup_google_glossary
@@ -162,7 +215,9 @@ def main():
         except Exception as exc:
             partial = getattr(exc, "partial_payload", None)
             if partial is not None:
-                filename = Path(
+                archive_dir = Path(ARCHIVE_DIR)
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                filename = archive_dir / (
                     f"sheet-partial-{datetime.now():%Y%m%d-%H%M%S}.json"
                 )
                 filename.write_text(

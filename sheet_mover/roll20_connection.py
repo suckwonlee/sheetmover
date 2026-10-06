@@ -12,7 +12,7 @@ import urllib.request
 
 from .result_store import CURRENT_RESULT_DIR, latest_complete_result, load_result
 
-STAGE4_VERSION = "2026-10-06-stage4-roll20-target-v1"
+STAGE4_VERSION = "2026-10-06-stage4-roll20-target-v2"
 DEFAULT_CDP_URL = "http://127.0.0.1:9222"
 
 DISCOVERY_SCRIPT = r"""
@@ -148,7 +148,7 @@ def _attach_driver(cdp_url):
         from selenium.webdriver.chrome.options import Options
     except ImportError as exc:
         raise RuntimeError(
-            "Selenium이 필요합니다. `.venv`에서 `pip install -r requirements-stage4.txt`를 한 번 실행하세요."
+            "Selenium이 필요합니다. `.venv`에서 `pip install -r requirements.txt`를 실행하세요."
         ) from exc
     host, port = _cdp_parts(cdp_url)
     options = Options()
@@ -239,9 +239,9 @@ def _normalize_matches(raw):
     return unique
 
 
-def check_roll20_target(result_path=None, cdp_url=DEFAULT_CDP_URL, save=True, driver_factory=None, on_progress=None):
+def check_roll20_target(result_path=None, source_id=None, cdp_url=DEFAULT_CDP_URL, save=True, driver_factory=None, on_progress=None):
     report = on_progress or (lambda _p, _m: None)
-    path = Path(result_path) if result_path else latest_complete_result()
+    path = Path(result_path) if result_path else latest_complete_result(source_id=source_id)
     if path is None or not path.is_file():
         raise RuntimeError("사용할 정상 결과 JSON이 없습니다. results/current 또는 프로젝트 루트를 확인하세요.")
 
@@ -295,11 +295,13 @@ def check_roll20_target(result_path=None, cdp_url=DEFAULT_CDP_URL, save=True, dr
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--result", help="사용할 sheet-result JSON. 생략하면 최신 정상 결과 자동 선택")
+    parser.add_argument("--source-id", help="자동 선택 시 사용할 D&D Beyond source_character_id")
     parser.add_argument("--cdp-url", default=DEFAULT_CDP_URL)
     parser.add_argument("--no-save", action="store_true")
     args = parser.parse_args()
     target, target_path = check_roll20_target(
         result_path=args.result,
+        source_id=args.source_id,
         cdp_url=args.cdp_url,
         save=not args.no_save,
         on_progress=_progress,
