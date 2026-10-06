@@ -42,7 +42,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE7_VERSION = "2026-10-06-stage7-roll20-spells-v1"
+STAGE7_VERSION = "2026-10-06-stage7-roll20-spells-v2-combat-fields"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -100,6 +100,7 @@ SPELL_FIELDS = (
     "spellsource",
     "spellattackid",
     "spelllevel",
+    "spell_damage_progression",
 )
 
 _COMPONENT_CODES = {
@@ -128,6 +129,189 @@ _ABILITY_BY_ID = {
     5: "Wisdom",
     6: "Charisma",
 }
+
+
+def _raw_spell_definitions(result_payload):
+    """Return D&D Beyond raw spell definitions keyed by character spell id."""
+    raw_source = _dict(_dict(result_payload).get("raw_source"))
+    out = {}
+
+    for class_spell_group in _list(raw_source.get("classSpells")):
+        class_spell_group = _dict(class_spell_group)
+        for spell in _list(class_spell_group.get("spells")):
+            spell = _dict(spell)
+            source_id = _text(spell.get("id"))
+            definition = _dict(spell.get("definition"))
+            if source_id and definition:
+                out[source_id] = definition
+
+    # Compatibility fallback if a future result exposes top-level spells.
+    for spell in _list(raw_source.get("spells")):
+        spell = _dict(spell)
+        source_id = _text(spell.get("id"))
+        definition = _dict(spell.get("definition"))
+        if source_id and definition:
+            out[source_id] = definition
+
+    return out
+
+
+def _raw_damage_modifier(raw_definition):
+    """Pick the primary DDB damage modifier without guessing conditional alts."""
+    modifiers = [
+        _dict(mod)
+        for mod in _list(_dict(raw_definition).get("modifiers"))
+        if _text(_dict(mod).get("type")).casefold() == "damage"
+    ]
+    if not modifiers:
+        return {}
+
+    # Prefer an unrestricted primary modifier. Toll the Dead, for example,
+    # carries its d12 exception as restriction text while the base die is d8.
+    unrestricted = [
+        mod for mod in modifiers
+        if not _text(mod.get("restriction"))
+    ]
+    if unrestricted:
+        return unrestricted[0]
+    return modifiers[0]
+
+
+def _damage_type_from_modifier(modifier):
+    modifier = _dict(modifier)
+    friendly = _text(modifier.get("friendlySubtypeName"))
+    if friendly:
+        return friendly
+    subtype = _text(modifier.get("subType"))
+    return subtype.title() if subtype else ""
+
+
+def _save_success_text(raw_definition):
+    """Conservative user-facing save result text from raw English rules text."""
+    raw_definition = _dict(raw_definition)
+    if not raw_definition.get("requiresSavingThrow"):
+        return ""
+
+    description = _text(raw_definition.get("description")).casefold()
+    if "successful save" in description and "half" in description:
+        return "성공 시 절반 피해"
+
+    modifier = _raw_damage_modifier(raw_definition)
+    if modifier:
+        return "성공 시 피해 없음"
+    return "성공 시 효과 없음"
+
+
+def _spell_combat_profile(item, raw_definition=None):
+    item = _dict(item)
+    raw_definition = _dict(raw_definition)
+
+    attack_type = raw_definition.get("attackType")
+    if attack_type is None:
+        attack_type = item.get("attack_type")
+
+    save_id = raw_definition.get("saveDcAbilityId")
+    if save_id is None:
+        save_id = item.get("save_dc_ability_id")
+
+    requires_attack = bool(raw_definition.get("requiresAttackRoll"))
+    if not raw_definition and attack_type is not None:
+        requires_attack = True
+
+    requires_save = bool(raw_definition.get("requiresSavingThrow"))
+    if not raw_definition and save_id is not None:
+        requires_save = True
+
+    as_part_weapon_attack = bool(raw_definition.get("asPartOfWeaponAttack"))
+
+    damage_modifier = _raw_damage_modifier(raw_definition)
+    die = _dict(damage_modifier.get("die"))
+    damage = _text(die.get("diceString"))
+    damage_type = _damage_type_from_modifier(damage_modifier)
+
+    level = item.get("level")
+    cantrip_progression = ""
+    if level == 0 and damage:
+        higher = _list(
+            _dict(damage_modifier.get("atHigherLevels"))
+            .get("higherLevelDefinitions")
+        )
+        levels = {
+            _dict(row).get("level")
+            for row in higher
+            if isinstance(row, dict)
+        }
+        if {5, 11, 17}.issubset(levels):
+            cantrip_progression = "Cantrip Dice"
+
+    higher_die_count = ""
+    higher_die_type = ""
+    higher_bonus = ""
+    if isinstance(level, int) and level > 0 and damage_modifier:
+        higher = [
+            _dict(row)
+            for row in _list(
+                _dict(damage_modifier.get("atHigherLevels"))
+                .get("higherLevelDefinitions")
+            )
+        ]
+        # DDB spell-scale entries use the base spell level as the "per slot
+        # above base" delta. Thunderwave: level 1 -> +1d8.
+        delta = next(
+            (
+                row for row in higher
+                if row.get("level") == level
+                and _dict(row.get("dice")).get("diceString")
+            ),
+            None,
+        )
+        if delta:
+            delta_dice = _dict(delta.get("dice"))
+            higher_die_count = _scalar(delta_dice.get("diceCount"))
+            dice_value = _scalar(delta_dice.get("diceValue"))
+            higher_die_type = f"d{dice_value}" if dice_value else ""
+            higher_bonus = _scalar(delta_dice.get("fixedValue"))
+            if higher_bonus == "0":
+                higher_bonus = ""
+
+    # A spell that explicitly delegates to a weapon attack must NOT be
+    # converted into a Roll20 Spell Attack. Doing so would use the spellcasting
+    # ability rather than the chosen weapon's STR/DEX. Booming Blade is the
+    # current sample case.
+    attack_output = (
+        not as_part_weapon_attack
+        and (requires_attack or requires_save)
+    )
+
+    if attack_type == 1 and requires_attack and not as_part_weapon_attack:
+        spell_attack = "Melee"
+    elif attack_type == 2 and requires_attack and not as_part_weapon_attack:
+        spell_attack = "Ranged"
+    else:
+        spell_attack = "None"
+
+    return {
+        "output": "ATTACK" if attack_output else "SPELLCARD",
+        "spellattack": spell_attack,
+        "damage": damage if attack_output else "",
+        "damage_type": damage_type if attack_output else "",
+        "save": _ABILITY_BY_ID.get(save_id, "") if attack_output else "",
+        "save_success": (
+            _save_success_text(raw_definition)
+            if attack_output
+            else ""
+        ),
+        "cantrip_progression": (
+            cantrip_progression if attack_output else ""
+        ),
+        "higher_die_count": higher_die_count if attack_output else "",
+        "higher_die_type": higher_die_type if attack_output else "",
+        "higher_bonus": higher_bonus if attack_output else "",
+        "requires_attack_roll": requires_attack,
+        "requires_saving_throw": requires_save,
+        "as_part_of_weapon_attack": as_part_weapon_attack,
+    }
+
 
 
 def _scalar(value, default=""):
@@ -307,7 +491,12 @@ def _prepared_value(item, known_spell_mode=False):
     return "0"
 
 
-def map_spell_row(item: dict[str, Any], *, known_spell_mode=False) -> dict[str, Any]:
+def map_spell_row(
+    item: dict[str, Any],
+    *,
+    known_spell_mode=False,
+    raw_definition=None,
+) -> dict[str, Any]:
     item = _dict(item)
     source_key = _text(item.get("source_key"))
     level = item.get("level")
@@ -321,6 +510,7 @@ def map_spell_row(item: dict[str, Any], *, known_spell_mode=False) -> dict[str, 
     school = _text(item.get("school")).casefold()
     ritual = item.get("ritual") is True or item.get("cast_only_as_ritual") is True
     concentration = item.get("concentration") is True
+    combat = _spell_combat_profile(item, raw_definition)
 
     components = _component_values(item.get("components"))
     fields = {
@@ -346,32 +536,31 @@ def map_spell_row(item: dict[str, Any], *, known_spell_mode=False) -> dict[str, 
         ),
         "spell_ability": "spell",
 
-        # Stage 10 owns attack/save/damage automation. Stage 7 intentionally
-        # keeps every imported spell as a plain spell card.
-        "spelloutput": "SPELLCARD",
-        "spellattack": "None",
-        "spelldamage": "",
-        "spelldamagetype": "",
+        # Stage 7 now prepares the native Legacy spell combat fields. Stage 10B
+        # creates/links the repeating_attack row deterministically because our
+        # Backbone writer does not fire Roll20's sheet-worker change event.
+        "spelloutput": combat["output"],
+        "spellattack": combat["spellattack"],
+        "spelldamage": combat["damage"],
+        "spelldamagetype": combat["damage_type"],
         "spelldamage2": "",
         "spelldamagetype2": "",
         "spellhealing": "",
         "spelldmgmod": "0",
-        "spellsave": "",
-        "spellsavesuccess": "",
-        "spellhldie": "",
-        "spellhldietype": "",
-        "spellhlbonus": "",
-        "includedesc": "off",
+        "spellsave": combat["save"],
+        "spellsavesuccess": combat["save_success"],
+        "spellhldie": combat["higher_die_count"],
+        "spellhldietype": combat["higher_die_type"],
+        "spellhlbonus": combat["higher_bonus"],
+        "includedesc": "on" if combat["output"] == "ATTACK" else "off",
 
-        # Stage 3 currently preserves the whole translated spell description.
-        # Keep it intact instead of guessing where an "At Higher Levels"
-        # subsection begins after translation.
         "spelldescription": _plain_text(item.get("description")),
         "spellathigherlevels": "",
         "spellclass": "",
         "spellsource": "",
         "spellattackid": "",
         "spelllevel": spell_level_value(level),
+        "spell_damage_progression": combat["cantrip_progression"],
     }
 
     return {
@@ -384,6 +573,7 @@ def map_spell_row(item: dict[str, Any], *, known_spell_mode=False) -> dict[str, 
         "name": name,
         "source_save_ability": _ABILITY_BY_ID.get(item.get("save_dc_ability_id"), ""),
         "source_attack_type": item.get("attack_type"),
+        "combat": combat,
         "fields": fields,
     }
 
@@ -512,12 +702,17 @@ def build_spell_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("roll20_payload.character.name이 없습니다.")
 
     known_mode = _known_spell_mode(character)
+    raw_spell_definitions = _raw_spell_definitions(result_payload)
     rows = []
     seen_source_keys = set()
     seen_locations = set()
 
     for item in spells:
-        row = map_spell_row(item, known_spell_mode=known_mode)
+        row = map_spell_row(
+            item,
+            known_spell_mode=known_mode,
+            raw_definition=raw_spell_definitions.get(_text(_dict(item).get("source_id"))),
+        )
         if row["source_key"] in seen_source_keys:
             raise RuntimeError(f"주문 source_key 중복: {row['source_key']}")
         location = (row["section"], row["row_id"])
@@ -544,7 +739,8 @@ def build_spell_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
             "preserve_unmanaged_rows": True,
             "delete_existing_rows": False,
             "stable_row_ids": True,
-            "spelloutput": "SPELLCARD",
+            "spelloutput": "combat-aware",
+            "combat_fields_prepared": True,
             "create_attacks": False,
         },
         "deferred": [
@@ -813,7 +1009,8 @@ def main():
     print("[시트 이동기] 7단계: Roll20 주문 반복행 입력")
     print(f"[시트 이동기] 모드: {'읽기 전용' if args.dry_run else '실제 입력'}")
     print("[시트 이동기] 기존 Roll20 주문은 삭제하지 않습니다.")
-    print("[시트 이동기] 주문은 SPELLCARD로만 입력하며 공격 반복행은 만들지 않습니다.")
+    print("[시트 이동기] 주문의 SPELLCARD/ATTACK 분류와 전투 필드를 입력합니다.")
+    print("[시트 이동기] 반복 공격행 생성/연결은 10B 단계에서 수행합니다.")
 
     report, output = apply_spells(
         result_path=args.result,
