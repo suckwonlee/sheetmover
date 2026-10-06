@@ -3,11 +3,12 @@
 Stages 1-3 intentionally do not require Roll20 or a browser.
 """
 import asyncio
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from urllib.parse import urlparse
 
 from .source import fetch_character, normalize_character, source_character_id
 from .hybrid_translator import TranslationError, Translator
+from .roll20_payload import build_roll20_payload
 
 SOURCE_URL = "https://www.dndbeyond.com/characters/170892133"
 TRANSLATION_FALLBACK_WARNING_PREFIX = (
@@ -99,6 +100,7 @@ class PreparationResult:
     roll20_tabs: list[dict]
     raw_source: dict
     applied: bool = False
+    roll20_payload: dict = field(default_factory=dict)
 
     @property
     def name(self):
@@ -175,6 +177,7 @@ class SheetMover:
                 "translation_summary": translator.translation_summary(),
                 "warnings": partial_warnings,
                 "roll20_tabs": [],
+                "roll20_payload": {},
                 "raw_source": raw,
                 "applied": False,
                 "error": {
@@ -187,6 +190,12 @@ class SheetMover:
             }
             raise
 
+        self.report(97, "Roll20용 반복 구조를 정리합니다.")
+        roll20_payload = build_roll20_payload(
+            translated,
+            original.to_dict(),
+        )
+
         warnings = list(original.warnings)
         translated_warnings = translated.get("warnings")
         if isinstance(translated_warnings, list):
@@ -195,8 +204,8 @@ class SheetMover:
                     warnings.append(warning)
 
         warnings.append(
-            "현재 2단계 미리보기입니다. 최종 능력치·HP·AC·레벨·숙련 보너스 "
-            "계산까지 완료했으며, Roll20 캐릭터 탐색과 입력은 아직 수행하지 않습니다."
+            "현재 3단계 미리보기입니다. 최종 수치와 장비·주문·특성·행동 반복 구조를 "
+            "Roll20 입력 직전 payload로 정리했으며, Roll20에는 아직 입력하지 않습니다."
         )
 
         summary = translation_summary(translated)
@@ -220,6 +229,7 @@ class SheetMover:
             warnings,
             [],
             raw,
+            roll20_payload=roll20_payload,
         )
 
     async def move(self):

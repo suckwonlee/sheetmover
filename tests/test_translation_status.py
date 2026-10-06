@@ -114,7 +114,8 @@ class CliTranslationStatusTests(unittest.TestCase):
         text = stderr.getvalue()
         self.assertIn("번역 부분 완료", text)
         self.assertIn("원문 유지 1개", text)
-        self.assertIn("Thunderwave source preview", text)
+        self.assertNotIn("Thunderwave source preview", text)
+        self.assertEqual(stdout.getvalue(), "")
 
 
 if __name__ == "__main__":

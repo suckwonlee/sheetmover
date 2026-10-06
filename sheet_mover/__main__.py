@@ -204,24 +204,6 @@ def main():
                 file=sys.stderr,
                 flush=True,
             )
-            preserved = summary.get("original_preserved") or []
-            if preserved:
-                print(
-                    "[시트 이동기] 원문 유지 항목:",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                for item in preserved:
-                    if not isinstance(item, dict):
-                        continue
-                    preview = str(item.get("source_preview") or "").strip()
-                    reason = str(item.get("reason") or "").strip()
-                    detail = preview if not reason else f"{preview} ({reason})"
-                    print(
-                        f"  - {detail}",
-                        file=sys.stderr,
-                        flush=True,
-                    )
         else:
             print(
                 "[시트 이동기] 번역 완료. "
@@ -229,13 +211,6 @@ def main():
                 file=sys.stderr,
                 flush=True,
             )
-        print(
-            json.dumps(
-                payload,
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
         return
 
     from .ui import main as gui_main

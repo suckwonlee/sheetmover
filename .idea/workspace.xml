@@ -7,44 +7,23 @@
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
       <change afterPath="$PROJECT_DIR$/.sheetmover-google-translation-cache.json" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/.sheetmover-ollama-review-cache.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260915-182935.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260915-183109.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260915-193354.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260915-193531.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260916-162540.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260916-170459.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260916-170606.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20260920-204715.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261001-172849.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261001-180126.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261001-180832.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261001-182041.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261001-190147.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261001-193016.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-partial-20261006-113652.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260915-180755.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260915-183958.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260916-160418.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260916-162759.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260916-163924.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260916-170738.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260917-195536.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260917-202111.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260917-205535.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260917-212949.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260920-192206.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260921-140153.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260921-143724.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20260921-164344.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage3.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage4.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/sheet-result-170892133-20261006-120034.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/calculator.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage2_calculator.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/result_cleanup.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/result_store.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_browser.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_connection.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_payload.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_result_cleanup.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_roll20_connection.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage3_payload.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage4_results.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/__main__.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/__main__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/mover.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/mover.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/source.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/source.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_hybrid_translation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_hybrid_translation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_preparation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_preparation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_translation_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_translation_status.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -158,7 +137,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791257187766</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791259642695</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1791259642695</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

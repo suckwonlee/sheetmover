@@ -3,3 +3,8 @@ __pycache__/
 *.py[cod]
 output/
 sheet-preview-*.json
+
+# Generated sheet-mover results
+sheet-result-*.json
+sheet-partial-*.json
+output_archive/
