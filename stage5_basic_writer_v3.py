@@ -297,11 +297,8 @@ def _chunks(items, size):
 
 
 def _save_json(path: Path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    from sheet_mover.result_store import write_json_atomic
+    write_json_atomic(path, payload)
 
 
 def _changed_names(before_snapshot, plan_attrs):
@@ -326,8 +323,8 @@ def _changed_names(before_snapshot, plan_attrs):
     return changed
 
 
-def run(source_id="170892133", cdp_url=DEFAULT_CDP_URL, dry_run=False):
-    result_path = latest_complete_result(source_id=source_id)
+def run(source_id="170892133", cdp_url=DEFAULT_CDP_URL, dry_run=False, *, result_path=None):
+    result_path = Path(result_path) if result_path is not None else latest_complete_result(source_id=source_id)
     if result_path is None:
         raise RuntimeError(f"source_id={source_id} 정상 결과를 찾지 못했습니다.")
 
@@ -473,10 +470,8 @@ def run(source_id="170892133", cdp_url=DEFAULT_CDP_URL, dry_run=False):
         return report, output_path
 
     except Exception as exc:
-        if "error" not in report:
-            report["status"] = "error"
-            report["error"] = str(exc)
-            _save_json(output_path, report)
+        from sheet_mover.result_store import record_stage_failure
+        record_stage_failure(exc, report, output_path)
         raise
     finally:
         _disconnect_driver(driver)

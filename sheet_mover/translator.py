@@ -1130,7 +1130,10 @@ class Translator:
             ) from exc
 
         try:
-            self.client = translate_v3.TranslationServiceClient()
+            from .app_config import runtime_google_credentials
+            self.client = translate_v3.TranslationServiceClient(
+                credentials=runtime_google_credentials()
+            )
         except Exception as exc:
             raise TranslationError(
                 "Google Cloud Translation 클라이언트 생성에 실패했습니다. "
@@ -3790,4 +3793,3 @@ class Translator:
 
         result["translation_summary"] = self.translation_summary()
         return result
-

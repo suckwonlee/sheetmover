@@ -5,10 +5,33 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage12_resource_writer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_roll20_resources.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE13_UI.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/SheetMover.spec" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/build_windows.ps1" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/requirements-build.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/app_config.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_app_config.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_full_run.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_ui_beginner_setup.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_ui_roll20_autolaunch.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_ui_roll20_manual_launch.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/google_glossary.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/google_glossary.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/result_store.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/result_store.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_attacks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_features.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_inventory.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_inventory.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_proficiencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_proficiencies.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spells.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spells.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/translator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/translator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/ui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/stage5_basic_writer_v2.py" beforeDir="false" afterPath="$PROJECT_DIR$/stage5_basic_writer_v2.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/stage5_basic_writer_v3.py" beforeDir="false" afterPath="$PROJECT_DIR$/stage5_basic_writer_v3.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,6 +68,7 @@
     "Python.__main__.executor": "Run",
     "Python.apply_stage2.executor": "Run",
     "Python.main.executor": "Run",
+    "Python.roll20_resources.executor": "Run",
     "Python.stage5_basic_writer.executor": "Run",
     "Python.stage5_basic_writer_v2.executor": "Run",
     "Python.stage5_basic_writer_v3.executor": "Run",
@@ -72,6 +96,37 @@
     <key name="MoveFile.RECENT_KEYS">
       <recent name="E:\sheet_mover\sheet_mover" />
     </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="sheet_mover" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.main" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
@@ -203,7 +258,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791275094036</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791276714191</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1791276714191</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

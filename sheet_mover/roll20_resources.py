@@ -466,7 +466,7 @@ function finish(status,error) {
   }
 
   done({
-    ok:true,
+    ok:status === 'success' || status === 'success_promise',
     fetch_status:status,
     fetch_error:error || '',
     row_ids:rowIds,
@@ -585,18 +585,13 @@ function waitDestroy(model,name) {
 
 
 def _resource_state(driver, target):
-    driver.set_script_timeout(25)
-    result = driver.execute_async_script(
+    from .roll20_read import read_persisted
+    return read_persisted(
+        driver,
         RESOURCE_STATE_SCRIPT,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
     )
-    if not isinstance(result, dict) or not result.get("ok"):
-        raise RuntimeError(
-            "Roll20 자원 반복행 상태 읽기 실패: "
-            + json.dumps(result, ensure_ascii=False)
-        )
-    return result
 
 
 def _split_reporder(value):
@@ -914,9 +909,8 @@ def apply_resources(
         return report, output_path
 
     except Exception as exc:
-        report["status"] = "error"
-        report["error"] = str(exc)
-        _save_json(output_path, report)
+        from .result_store import record_stage_failure
+        record_stage_failure(exc, report, output_path)
         raise
     finally:
         _disconnect_driver(driver)

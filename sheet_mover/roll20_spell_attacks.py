@@ -567,10 +567,8 @@ def apply_spell_attacks(
         return report, output_path
 
     except Exception as exc:
-        if "error" not in report:
-            report["status"] = "error"
-            report["error"] = str(exc)
-            _save_json(output_path, report)
+        from .result_store import record_stage_failure
+        record_stage_failure(exc, report, output_path)
         raise
     finally:
         _disconnect_driver(driver)

@@ -441,7 +441,7 @@ function finish(status, error) {
   if (settled) return;
   settled = true;
   done({
-    ok:true,
+    ok:status === 'success' || status === 'success_promise',
     fetch_status:status,
     fetch_error:error || '',
     character_id:idOf(character),
@@ -706,19 +706,14 @@ def _load_target(source_id):
 
 
 def _snapshot(driver, target, names):
-    driver.set_script_timeout(20)
-    result = driver.execute_async_script(
+    from sheet_mover.roll20_read import read_persisted
+    return read_persisted(
+        driver,
         FETCH_SCRIPT,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
         sorted(names),
     )
-    if not isinstance(result, dict) or not result.get("ok"):
-        raise RuntimeError(
-            "Roll20 서버 attribute 읽기 실패: "
-            + json.dumps(result, ensure_ascii=False)
-        )
-    return result
 
 
 def _persisted_single(snapshot, name):

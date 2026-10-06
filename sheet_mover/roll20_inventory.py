@@ -428,7 +428,7 @@ function finish(status,error) {
   if (settled) return;
   settled=true;
   done({
-    ok:true,
+    ok:status === 'success' || status === 'success_promise',
     fetch_status:status,
     fetch_error:error || '',
     character_id:idOf(character),
@@ -630,19 +630,14 @@ function createNew(collection,name,spec) {
 
 
 def _snapshot(driver, target, names):
-    driver.set_script_timeout(25)
-    result = driver.execute_async_script(
+    from .roll20_read import read_persisted
+    return read_persisted(
+        driver,
         FETCH_ATTRS_SCRIPT,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
         list(names),
     )
-    if not isinstance(result, dict) or not result.get("ok"):
-        raise RuntimeError(
-            "Roll20 attribute 읽기 실패: "
-            + json.dumps(result, ensure_ascii=False)
-        )
-    return result
 
 
 def _verify(snapshot, expected_attrs):
@@ -698,11 +693,8 @@ def _row_is_complete(snapshot, row_attrs):
 
 
 def _save_json(path: Path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    from .result_store import write_json_atomic
+    write_json_atomic(path, payload)
 
 
 def apply_inventory(
@@ -885,10 +877,8 @@ def apply_inventory(
         return report, output_path
 
     except Exception as exc:
-        if "error" not in report:
-            report["status"] = "error"
-            report["error"] = str(exc)
-            _save_json(output_path, report)
+        from .result_store import record_stage_failure
+        record_stage_failure(exc, report, output_path)
         raise
     finally:
         _disconnect_driver(driver)

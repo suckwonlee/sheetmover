@@ -602,7 +602,7 @@ function finish(status,error) {
     };
   }
   done({
-    ok:true,
+    ok:status === 'success' || status === 'success_promise',
     fetch_status:status,
     fetch_error:error || '',
     rows,
@@ -721,18 +721,13 @@ function waitDestroy(model,name) {
 
 
 def _attack_state(driver, target):
-    driver.set_script_timeout(25)
-    result = driver.execute_async_script(
+    from .roll20_read import read_persisted
+    return read_persisted(
+        driver,
         ATTACK_STATE_SCRIPT,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
     )
-    if not isinstance(result, dict) or not result.get("ok"):
-        raise RuntimeError(
-            "Roll20 attack 상태 읽기 실패: "
-            + json.dumps(result, ensure_ascii=False)
-        )
-    return result
 
 
 def _delete_rows(driver, target, row_ids):
@@ -984,10 +979,8 @@ def apply_attacks(
         return report, output_path
 
     except Exception as exc:
-        if "error" not in report:
-            report["status"] = "error"
-            report["error"] = str(exc)
-            _save_json(output_path, report)
+        from .result_store import record_stage_failure
+        record_stage_failure(exc, report, output_path)
         raise
     finally:
         _disconnect_driver(driver)
