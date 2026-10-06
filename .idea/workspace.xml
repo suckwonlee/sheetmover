@@ -5,15 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/sheet_mover/hybrid_translator.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/semantic_validator.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/translation_config.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/translation_render.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_hybrid_translation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/semantic_preprocessor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/translation_units.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/mover.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/mover.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/hybrid_translator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/hybrid_translator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/translation_config.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/translation_config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_hybrid_translation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_hybrid_translation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -110,7 +107,15 @@
       <option name="project" value="LOCAL" />
       <updated>1789900016069</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1789985150688</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1789985150689</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
