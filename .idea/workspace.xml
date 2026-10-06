@@ -5,12 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/stage5_basic_writer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage5_basic_writer_v2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage5_dom_probe.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage5_probe.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage5_probe_v2.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage5_recovery_probe.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sheet_mover/roll20_inventory.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/stage6_inventory_writer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_roll20_inventory.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -50,6 +47,7 @@
     "Python.main.executor": "Run",
     "Python.stage5_basic_writer.executor": "Run",
     "Python.stage5_basic_writer_v2.executor": "Run",
+    "Python.stage5_basic_writer_v3.executor": "Run",
     "Python.stage5_dom_probe.executor": "Run",
     "Python.stage5_probe.executor": "Run",
     "Python.stage5_probe_v2.executor": "Run",
@@ -66,8 +64,8 @@
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="E:\sheet_mover" />
-      <recent name="E:\sheet_mover\tests" />
       <recent name="E:\sheet_mover\sheet_mover" />
+      <recent name="E:\sheet_mover\tests" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="E:\sheet_mover\sheet_mover" />
@@ -155,7 +153,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791263715801</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791266485452</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1791266485452</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
