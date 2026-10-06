@@ -95,7 +95,7 @@ class PreparationTests(unittest.TestCase):
             )
         )
 
-    def test_unresolved_stats_are_not_base_scores(self):
+    def test_stage2_applies_direct_score_modifier(self):
         sheet = normalize_character(
             {
                 "name": "Hero",
@@ -111,7 +111,7 @@ class PreparationTests(unittest.TestCase):
                 },
             }
         )
-        self.assertIsNone(sheet.ability_scores["strength"])
+        self.assertEqual(sheet.ability_scores["strength"], 14)
         self.assertIsNone(sheet.hp)
         self.assertTrue(sheet.warnings)
         self.assertEqual(
@@ -222,7 +222,7 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(sheet.background["name"], "Sage")
         self.assertEqual(sheet.classes[0]["name"], "Wizard")
         self.assertEqual(sheet.classes[0]["level"], 5)
-        self.assertIsNone(sheet.total_level)
+        self.assertEqual(sheet.total_level, 5)
         self.assertEqual(sheet.temp_hp, 7)
         self.assertEqual(sheet.currencies["gp"], 123)
         self.assertEqual(

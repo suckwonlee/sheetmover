@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .models import CharacterSheet
+from .calculator import apply_stage2_calculations
 
 ABILITIES = {
     1: "strength",
@@ -197,6 +198,12 @@ def _normalize_inventory_item(entry, kind="equipment"):
         rarity=definition.get("rarity"),
         magic=definition.get("magic"),
         armor_class=definition.get("armorClass"),
+        armor_type_id=definition.get("armorTypeId"),
+        base_armor_name=definition.get("baseArmorName"),
+        can_equip=definition.get("canEquip"),
+        can_attune=definition.get("canAttune"),
+        is_consumable=definition.get("isConsumable"),
+        granted_modifiers=deepcopy(definition.get("grantedModifiers") or []),
         damage=deepcopy(definition.get("damage")),
         damage_type=definition.get("damageType"),
         range=deepcopy(definition.get("range")),
@@ -715,6 +722,22 @@ def normalize_character(data):
             }
             for cls in sheet.classes
         ],
+        "class_feature_levels": [
+            {
+                "feature_id": str(
+                    _dict(_dict(feature).get("definition") or feature).get("id")
+                    or ""
+                ),
+                "class_name": str(
+                    _dict(character_class.get("definition")).get("name")
+                    or ""
+                ),
+                "class_level": _number(character_class.get("level")),
+            }
+            for character_class in _list(data.get("classes"))
+            if isinstance(character_class, dict)
+            for feature in _active_class_feature_entries(character_class)
+        ],
         "class_spellcasting": [
             {
                 "class_name": cls.get("name", ""),
@@ -985,4 +1008,9 @@ def normalize_character(data):
         "공격, 스킬/내성/전문화, 클래스 자원의 Roll20 변환은 각각 10·11·12단계에서 "
         "구현합니다."
     )
+
+    # Stage 2: produce Roll20-ready final numeric values from the
+    # concrete D&D Beyond source facts preserved above. Unsupported
+    # conditional rules fail closed instead of being guessed.
+    apply_stage2_calculations(sheet)
     return sheet

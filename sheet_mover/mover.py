@@ -195,7 +195,8 @@ class SheetMover:
                     warnings.append(warning)
 
         warnings.append(
-            "현재 1단계 미리보기입니다. Roll20 캐릭터 탐색과 입력은 아직 수행하지 않습니다."
+            "현재 2단계 미리보기입니다. 최종 능력치·HP·AC·레벨·숙련 보너스 "
+            "계산까지 완료했으며, Roll20 캐릭터 탐색과 입력은 아직 수행하지 않습니다."
         )
 
         summary = translation_summary(translated)
