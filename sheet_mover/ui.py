@@ -489,12 +489,13 @@ class SheetMoverUI(tk.Tk):
         self._refresh_start()
 
         event_path = run_folder / "events.jsonl"
-        log_path = run_folder / "worker.log"
+        log_path = run_folder / "run.log"
         command = self._worker_command(snapshot_path) + [
             "--events", str(event_path), "--log", str(log_path), "--run-id", run_id,
         ]
         self.log("통합 실행 시작")
         self.log(f"작업 기록: {run_folder}")
+        self.log(f"실행 로그: {log_path}")
 
         def worker():
             env = os.environ.copy()
@@ -516,6 +517,13 @@ class SheetMoverUI(tk.Tk):
                 self._post(self._worker_done, code, error)
             except Exception as exc:
                 self._post(self._worker_failure, str(exc))
+            finally:
+                # events/settings are IPC files, not retained user logs.
+                for transient in (event_path, snapshot_path):
+                    try:
+                        Path(transient).unlink(missing_ok=True)
+                    except OSError:
+                        pass
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -571,7 +579,7 @@ class SheetMoverUI(tk.Tk):
             messagebox.showerror(
                 "시트 이동기",
                 (error or "시트 이동이 중단되었습니다.")
-                + "\n이미 입력된 내용이 있을 수 있습니다. 로그와 결과 기록을 확인하세요.",
+                + "\n완료된 단계는 유지됩니다. 다시 실행하면 같은 값은 건너뜁니다. 세부 원인은 run.log를 확인하세요.",
             )
 
     def _worker_failure(self, message):

@@ -5,10 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/README_STAGE10B_V13.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage10b_v13_link_dispatch.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage10b_link_dispatch.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_RUNTIME_INTEGRITY_V22.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_RUNTIME_INTEGRITY_V23.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_runtime_integrity_v22.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_runtime_integrity_v23.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/patch_support_runtime_v22.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage11_resilient_writer_v22.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage7_grouped_spell_sources_v21.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/mover.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/mover.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_proficiencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_proficiencies.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spells.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spells.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/ui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_full_run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -267,7 +277,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791351568538</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791352163855</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1791352163855</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

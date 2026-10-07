@@ -124,14 +124,17 @@ class SheetMover:
         self.cdp_url = cdp_url  # stage 4부터 사용
         self.report = on_progress or (lambda percent, message: None)
 
-    async def prepare(self):
+    async def prepare(self, raw_source=None):
         self.report(5, "D&D Beyond 링크를 확인합니다.")
-        self.report(15, "D&D Beyond 원본 데이터를 수집합니다.")
-
-        raw = await asyncio.to_thread(
-            fetch_character,
-            self.source_url,
-        )
+        if raw_source is None:
+            self.report(15, "D&D Beyond 원본 데이터를 수집합니다.")
+            raw = await asyncio.to_thread(
+                fetch_character,
+                self.source_url,
+            )
+        else:
+            self.report(15, "사전 점검에서 확인한 D&D Beyond 원본을 사용합니다.")
+            raw = raw_source
         original = normalize_character(raw)
 
         self.report(
@@ -241,11 +244,11 @@ class SheetMover:
 BrowserMover = SheetMover
 
 
-def run(source_url=SOURCE_URL, cdp_url=None, on_progress=None):
+def run(source_url=SOURCE_URL, cdp_url=None, on_progress=None, raw_source=None):
     return asyncio.run(
         SheetMover(
             source_url,
             cdp_url,
             on_progress,
-        ).prepare()
+        ).prepare(raw_source=raw_source)
     )

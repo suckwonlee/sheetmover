@@ -15,7 +15,7 @@ from .app_config import (
     data_dir, load_settings, validate_settings,
 )
 
-FULL_RUN_VERSION = "2026-10-06-stage13-full-run-v2.1-soft-fallback"
+FULL_RUN_VERSION = "2026-10-07-stage13-full-run-v2.3-roll20-preflight-cache"
 STAGES = (
     "D&D Beyond 수집 · 번역 · 계산", "Roll20 대상 확인", "기본 능력치",
     "인벤토리", "주문", "특성", "무기 공격", "주문 공격", "숙련", "자원",
@@ -25,6 +25,77 @@ STAGES = (
 def _write_json(path: Path, payload: dict) -> Path:
     from .result_store import write_json_atomic
     return write_json_atomic(path, payload)
+
+
+def _result_summary(payload):
+    if not isinstance(payload, dict):
+        return {}
+    summary = payload.get("translation_summary")
+    if isinstance(summary, dict):
+        return summary
+    translated = payload.get("translated")
+    if isinstance(translated, dict):
+        summary = translated.get("translation_summary")
+        if isinstance(summary, dict):
+            return summary
+    return {}
+
+
+def _stable_json(value):
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError):
+        return ""
+
+
+def _find_reusable_result(source_id: str, raw_source: dict):
+    # Reuse only a result produced from the exact same D&D Beyond raw payload.
+    folder = data_dir() / "results" / "current"
+    if not folder.is_dir():
+        return None, None
+
+    wanted_raw = _stable_json(raw_source)
+    if not wanted_raw:
+        return None, None
+
+    candidates = sorted(
+        folder.glob(f"sheet-result-{source_id}-*.json"),
+        key=lambda path: path.name,
+        reverse=True,
+    )
+    for path in candidates:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+
+        original = payload.get("original")
+        if not isinstance(original, dict):
+            continue
+        if str(original.get("source_id") or "").strip() != str(source_id).strip():
+            continue
+
+        summary = _result_summary(payload)
+        if str(summary.get("status") or "").strip() not in {"complete", "partial"}:
+            continue
+        if not isinstance(payload.get("roll20_payload"), dict):
+            continue
+
+        cached_raw = payload.get("raw_source")
+        if not isinstance(cached_raw, dict):
+            continue
+        if _stable_json(cached_raw) != wanted_raw:
+            continue
+        return payload, path
+
+    return None, None
 
 
 def _emit_stdout(event: dict):
@@ -83,16 +154,11 @@ def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=N
         problems = validate_settings(settings)
         if problems:
             raise RuntimeError(" / ".join(problems))
-        for name, check in (("Google", check_google), ("Ollama", check_ollama)):
-            result = check(settings)
-            if not result.get("ok"):
-                raise RuntimeError(f"{name}: {result.get('message', '설정 오류')} "
-                                   f"{result.get('detail') or ''}".strip())
-
         # Import stages only after applying the worker's settings snapshot.
         from .mover import run as prepare
         from .result_store import default_result_path
         from .roll20_connection import check_roll20_target
+        from .source import fetch_character
         from .roll20_inventory import apply_inventory
         from .roll20_spells import apply_spells
         from .roll20_features import apply_features
@@ -102,58 +168,134 @@ def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=N
         from .roll20_resources import apply_resources
         from stage5_basic_writer_v3 import run as apply_basic
 
-        stage(1, "running")
-        prepared = prepare(source_url, cdp_url=settings.roll20_cdp_url,
-                           on_progress=lambda p, m: overall(float(p) * .30, m))
-        payload = prepared.to_dict()
-        original = payload.get("original") or {}
-        source_id = str(original.get("source_id") or "").strip()
+        # Do not spend translation work until the actual Roll20 destination is ready.
+        stage(2, "running", "번역 전에 Roll20 대상과 시트 상태를 확인합니다.")
+        overall(1, "D&D Beyond 캐릭터 ID와 이름만 먼저 확인합니다.")
+        identity_raw = fetch_character(source_url)
+        source_id = str(identity_raw.get("id") or "").strip()
+        character_name = str(identity_raw.get("name") or "").strip()
+        if not source_id or not character_name:
+            raise RuntimeError("D&D Beyond 원본에서 캐릭터 ID/이름을 확인하지 못했습니다.")
+
         state["source_character_id"] = source_id
-        state["character_name"] = original.get("name") or ""
-        if not source_id:
-            raise RuntimeError("D&D Beyond source ID를 확인하지 못했습니다.")
-        summary = payload.get("translation_summary") or {}
-        translation_status = str(summary.get("status") or "").strip()
-        preserved_count = int(summary.get("original_preserved_count") or 0)
-        state["translation_summary"] = summary
+        state["character_name"] = character_name
 
-        # translate_character() returning normally means unsafe fragments were
-        # already replaced by their exact English source text. That is a safe
-        # soft fallback, not corrupted data. A real TranslationError still
-        # follows the exception path and stops before Roll20 mutation.
-        if translation_status not in {"complete", "partial"}:
+        preflight_path = data_dir() / "workers" / run_id / "roll20-preflight.json"
+        _write_json(
+            preflight_path,
+            {
+                "original": {"source_id": source_id, "name": character_name},
+                "roll20_payload": {
+                    "source_character_id": source_id,
+                    "character": {"name": character_name},
+                },
+            },
+        )
+        try:
+            target, target_path = check_roll20_target(
+                result_path=preflight_path,
+                source_id=source_id,
+                cdp_url=settings.roll20_cdp_url,
+                save=True,
+            )
+        finally:
+            preflight_path.unlink(missing_ok=True)
+
+        sheet_type = str(getattr(target, "sheet_type", "") or "").strip()
+        if sheet_type != "ogl5e":
             raise RuntimeError(
-                "번역 결과 상태를 확인할 수 없어 Roll20 입력을 중단합니다. "
-                f"상태={translation_status or '없음'}"
+                "Roll20 대상 캐릭터가 Legacy OGL5e 시트가 아닙니다. "
+                f"확인된 시트 유형: {sheet_type or '미확인'}"
             )
 
-        result_path = default_result_path(source_id, root=data_dir())
-        _write_json(result_path, payload)
-        state["paths"]["sheet_result"] = str(result_path.resolve())
-
-        if translation_status == "partial":
-            stage(
-                1,
-                "pass",
-                f"원문 {preserved_count}개를 안전하게 유지하고 계속 진행합니다. "
-                f"결과 저장: {result_path.name}",
-            )
-            overall(
-                30,
-                f"D&D Beyond 준비 완료 · 원문 유지 {preserved_count}개",
-            )
-        else:
-            stage(1, "pass", f"결과 저장: {result_path.name}")
-            overall(30, "D&D Beyond 준비 완료")
-
-        stage(2, "running")
-        target, target_path = check_roll20_target(
-            result_path=result_path, source_id=source_id,
-            cdp_url=settings.roll20_cdp_url, save=True)
         state["reports"]["target"] = (
-            target.__dict__ if hasattr(target, "__dict__") else str(target))
+            target.__dict__ if hasattr(target, "__dict__") else str(target)
+        )
         state["paths"]["target"] = str(Path(target_path).resolve())
-        stage(2, "pass")
+        stage(2, "pass", "Roll20 게임 탭 · 대상 캐릭터 · Legacy OGL5e 시트 확인 완료")
+        overall(5, "Roll20 준비 완료. 기존 번역 결과를 확인합니다.")
+
+        payload, reusable_path = _find_reusable_result(source_id, identity_raw)
+        if payload is not None and reusable_path is not None:
+            original = payload.get("original") or {}
+            if str(original.get("name") or "").strip() != character_name:
+                payload = None
+                reusable_path = None
+
+        if payload is not None and reusable_path is not None:
+            result_path = Path(reusable_path)
+            summary = _result_summary(payload)
+            translation_status = str(summary.get("status") or "").strip()
+            preserved_count = int(summary.get("original_preserved_count") or 0)
+            state["translation_summary"] = summary
+            state["paths"]["sheet_result"] = str(result_path.resolve())
+            if translation_status == "partial":
+                stage(
+                    1,
+                    "pass",
+                    f"기존 번역 결과 재사용: {result_path.name} · "
+                    f"원문 유지 {preserved_count}개",
+                )
+                overall(
+                    30,
+                    f"기존 번역 재사용 완료 · API 번역 생략 · 원문 유지 {preserved_count}개",
+                )
+            else:
+                stage(1, "pass", f"기존 번역 결과 재사용: {result_path.name}")
+                overall(30, "기존 번역 재사용 완료 · API 번역 생략")
+        else:
+            stage(1, "running", "Roll20 준비 완료. 번역 서비스 상태를 확인합니다.")
+            overall(5, "재사용 가능한 번역이 없습니다. 번역 서비스 상태를 확인합니다.")
+            for name, check in (("Google", check_google), ("Ollama", check_ollama)):
+                result = check(settings)
+                if not result.get("ok"):
+                    raise RuntimeError(
+                        f"{name}: {result.get('message', '설정 오류')} "
+                        f"{result.get('detail') or ''}".strip()
+                    )
+
+            prepared = prepare(
+                source_url,
+                cdp_url=settings.roll20_cdp_url,
+                on_progress=lambda p, m: overall(5 + float(p) * .25, m),
+                raw_source=identity_raw,
+            )
+            payload = prepared.to_dict()
+            original = payload.get("original") or {}
+            prepared_source_id = str(original.get("source_id") or "").strip()
+            prepared_name = str(original.get("name") or "").strip()
+            if prepared_source_id != source_id or prepared_name != character_name:
+                raise RuntimeError(
+                    "사전 확인한 D&D Beyond 캐릭터와 번역 대상이 달라졌습니다. "
+                    "Roll20 입력을 중단합니다."
+                )
+
+            summary = payload.get("translation_summary") or {}
+            translation_status = str(summary.get("status") or "").strip()
+            preserved_count = int(summary.get("original_preserved_count") or 0)
+            state["translation_summary"] = summary
+            if translation_status not in {"complete", "partial"}:
+                raise RuntimeError(
+                    "번역 결과 상태를 확인할 수 없어 Roll20 입력을 중단합니다. "
+                    f"상태={translation_status or '없음'}"
+                )
+
+            result_path = default_result_path(source_id, root=data_dir())
+            _write_json(result_path, payload)
+            state["paths"]["sheet_result"] = str(result_path.resolve())
+
+            if translation_status == "partial":
+                stage(
+                    1,
+                    "pass",
+                    f"원문 {preserved_count}개를 안전하게 유지하고 계속 진행합니다. "
+                    f"결과 저장: {result_path.name}",
+                )
+                overall(30, f"D&D Beyond 준비 완료 · 원문 유지 {preserved_count}개")
+            else:
+                stage(1, "pass", f"결과 저장: {result_path.name}")
+                overall(30, "D&D Beyond 준비 완료")
+
         run_stage(3, "basic", apply_basic, source_id=source_id,
                   result_path=result_path, cdp_url=settings.roll20_cdp_url, dry_run=False)
         for index, key, func in (

@@ -54,13 +54,20 @@ class FullRunFailureTests(unittest.TestCase):
         self.stack.enter_context(patch.object(full_run, "check_ollama", return_value={"ok": True}))
         self.settings = AppSettings(google_project_id="fixture")
         self.events = []
+        self.fetch_character = self.stack.enter_context(
+            patch("sheet_mover.source.fetch_character")
+        )
+        self.fetch_character.return_value = {"id": 1, "name": "fixture"}
         self.payload = {"original": {"source_id": "1", "name": "fixture"},
                         "translated": {"features": [{"name": "translated"}]},
                         "translation_summary": {"status": "complete"}}
         self.prepare = self.stack.enter_context(patch("sheet_mover.mover.run"))
         self.prepare.return_value.to_dict.return_value = self.payload
         self.target = self.stack.enter_context(patch("sheet_mover.roll20_connection.check_roll20_target"))
-        self.target.return_value = (SimpleNamespace(character_name="fixture"), self.root / "target.json")
+        self.target.return_value = (
+            SimpleNamespace(character_name="fixture", sheet_type="ogl5e"),
+            self.root / "target.json",
+        )
         self.writers = []
         for path in (
             "stage5_basic_writer_v3.run", "sheet_mover.roll20_inventory.apply_inventory",
@@ -91,6 +98,38 @@ class FullRunFailureTests(unittest.TestCase):
         self.assertEqual(self.writers[0].call_args.kwargs["result_path"].resolve(),
                          Path(report["paths"]["sheet_result"]))
         self.assertEqual(self.events[-1]["type"], "complete")
+
+    def test_roll20_preflight_happens_before_translation(self):
+        order = []
+
+        self.fetch_character.side_effect = lambda _url: (
+            order.append("source") or {"id": 1, "name": "fixture"}
+        )
+        self.target.side_effect = lambda **_kwargs: (
+            order.append("roll20")
+            or (
+                SimpleNamespace(character_name="fixture", sheet_type="ogl5e"),
+                self.root / "target.json",
+            )
+        )
+        original_prepare = self.prepare.return_value
+
+        def prepared(*_args, **_kwargs):
+            order.append("translate")
+            return original_prepare
+
+        self.prepare.side_effect = prepared
+        self.run_move()
+        self.assertLess(order.index("roll20"), order.index("translate"))
+
+    def test_roll20_preflight_failure_stops_before_translation(self):
+        self.target.side_effect = RuntimeError("Roll20 target unavailable")
+        with self.assertRaises(RuntimeError):
+            self.run_move()
+        self.prepare.assert_not_called()
+        report = self.report()
+        self.assertEqual(report["stage_statuses"]["2"], "error")
+        self.assertEqual(report["stage_statuses"]["1"], "pending")
 
     def test_partial_return_continues_with_exact_original_fallback(self):
         self.payload["translation_summary"] = {
@@ -137,7 +176,7 @@ class FullRunFailureTests(unittest.TestCase):
         self.assertEqual(partial["error"]["failed_text"], "rule text")
         self.assertEqual(partial["translated"], self.payload["translated"])
         self.assertFalse(partial["applied"])
-        self.target.assert_not_called()
+        self.target.assert_called_once()
         self.assertIsNone(latest_complete_result(root=self.root))
 
     def test_middle_stage_failure_keeps_completed_stages_and_does_not_continue(self):
@@ -211,7 +250,7 @@ class FullRunFailureTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 self.run_move()
         self.assertTrue(Path(self.report()["paths"]["partial_result"]).exists())
-        self.target.assert_not_called()
+        self.target.assert_called_once()
 
     def test_final_report_save_failure_never_emits_complete(self):
         real_write = full_run._write_json

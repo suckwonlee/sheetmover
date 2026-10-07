@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -46,10 +47,11 @@ from .roll20_inventory import (
 )
 
 
-STAGE11_VERSION = "2026-10-06-stage11-roll20-proficiencies-v2.1-reporder"
+STAGE11_VERSION = "2026-10-07-stage11-roll20-proficiencies-v2.3-resilient-batches"
 PB_CHECKED = "(@{pb})"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
+WRITE_BATCH_SIZE = 16
 
 QUERY_ABILITY = (
     "?{Attribute?|"
@@ -243,15 +245,51 @@ def _skill_entries(result_payload):
     return entries
 
 
+def _starting_class_context(original):
+    classes = [
+        _dict(row)
+        for row in _list(_dict(original).get("classes"))
+        if isinstance(row, dict)
+    ]
+    starting = next(
+        (
+            _text(row.get("original_name") or row.get("name"))
+            for row in classes
+            if row.get("is_starting_class") is True
+        ),
+        "",
+    )
+    if not starting and classes:
+        starting = _text(classes[0].get("original_name") or classes[0].get("name"))
+
+    feature_owners = {}
+    calculation_inputs = _dict(_dict(original).get("calculation_inputs"))
+    for row in _list(calculation_inputs.get("class_feature_levels")):
+        row = _dict(row)
+        feature_id = _text(row.get("feature_id"))
+        class_name = _text(row.get("class_name"))
+        if feature_id and class_name:
+            feature_owners[feature_id] = class_name
+
+    core_feature_ids = set()
+    for feature in _list(_dict(original).get("features")):
+        feature = _dict(feature)
+        if _text(feature.get("kind")) != "class_feature":
+            continue
+        original_name = _text(feature.get("original_name") or feature.get("name"))
+        if original_name.startswith("Core ") and original_name.endswith(" Traits"):
+            feature_id = _text(feature.get("source_id") or feature.get("definition_id"))
+            if feature_id:
+                core_feature_ids.add(feature_id)
+
+    return starting, feature_owners, core_feature_ids
+
+
 def _save_entries(result_payload):
     original = _original_character(result_payload)
     result = set()
-
-    for value in _list(original.get("saving_throw_proficiencies")):
-        text = _text(value).strip().casefold()
-        for ability in ABILITY_ORDER:
-            if text == f"{ability} saving throws":
-                result.add(ability)
+    detailed_save_found = False
+    starting_class, feature_owners, core_feature_ids = _starting_class_context(original)
 
     for entry in _list(original.get("proficiency_entries")):
         entry = _dict(entry)
@@ -259,8 +297,29 @@ def _save_entries(result_payload):
             continue
         raw_subtype = _text(entry.get("subType")).strip().casefold()
         ability = SAVE_SUBTYPE_TO_ABILITY.get(raw_subtype)
-        if ability:
-            result.add(ability)
+        if not ability:
+            continue
+        detailed_save_found = True
+
+        component_id = _text(entry.get("componentId"))
+        source_group = _text(entry.get("source_group")).casefold()
+        owner = feature_owners.get(component_id, "")
+        if (
+            source_group == "class"
+            and starting_class
+            and owner
+            and owner != starting_class
+            and component_id in core_feature_ids
+        ):
+            continue
+        result.add(ability)
+
+    if not detailed_save_found:
+        for value in _list(original.get("saving_throw_proficiencies")):
+            value_text = _text(value).strip().casefold()
+            for ability in ABILITY_ORDER:
+                if value_text == f"{ability} saving throws":
+                    result.add(ability)
 
     return result
 
@@ -355,7 +414,7 @@ def _non_skill_proficiency_rows(result_payload, pb):
             continue
 
         key = _entry_key(entry)
-        if not key:
+        if not key or key.startswith("choose_a_"):
             continue
 
         display_name = _entry_display_name(entry, translated_map)
@@ -548,6 +607,11 @@ def build_proficiency_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
             "stable_row_ids": True,
             "tool_ability": "query_each_roll",
             "write_visible_skill_save_bonus": True,
+            "write_batch_size": WRITE_BATCH_SIZE,
+            "persisted_state_after_callback_timeout": True,
+            "no_wait_repair": True,
+            "starting_class_saves_only": True,
+            "omit_generic_choice_placeholders": True,
         },
     }
 
@@ -943,28 +1007,192 @@ def _load_target(source_id: str):
     return payload, path
 
 
-def _upsert_and_verify(driver, target, attrs):
-    driver.set_script_timeout(120)
+STAGE11_NO_WAIT_ATTR_SCRIPT = r"""
+const wantedId = String(arguments[0] || '').trim();
+const wantedName = String(arguments[1] || '').trim();
+const attrName = String(arguments[2] || '').trim();
+const spec = arguments[3] || {};
+const done = arguments[arguments.length - 1];
+
+function val(obj,key) {
+  try {
+    if (!obj) return null;
+    if (obj.attributes && obj.attributes[key] != null) return obj.attributes[key];
+    if (typeof obj.get === 'function') {
+      const v=obj.get(key); if (v != null) return v;
+    }
+    if (obj[key] != null) return obj[key];
+  } catch (_) {}
+  return null;
+}
+function modelsOf(c) {
+  try {
+    if (!c) return [];
+    if (Array.isArray(c.models)) return c.models;
+    if (typeof c.toArray === 'function') return c.toArray();
+    if (Array.isArray(c)) return c;
+  } catch (_) {}
+  return [];
+}
+function idOf(m) {
+  return String(val(m,'id') || val(m,'_id') || val(m,'characterid') || (m && m.id) || '').trim();
+}
+function findCharacter() {
+  const campaigns=[];
+  try { if (window.d20 && window.d20.Campaign) campaigns.push(window.d20.Campaign); } catch (_) {}
+  try { if (window.Campaign) campaigns.push(window.Campaign); } catch (_) {}
+  for (const campaign of campaigns) {
+    const collections=[campaign.characters, campaign.attributes && campaign.attributes.characters];
+    for (const collection of collections) {
+      for (const model of modelsOf(collection)) {
+        const id=idOf(model);
+        const name=String(val(model,'name') || '').trim();
+        if ((wantedId && id===wantedId) || (!wantedId && wantedName && name===wantedName)) return model;
+      }
+    }
+  }
+  return null;
+}
+function named(collection,name) {
+  return modelsOf(collection).filter(m=>String(val(m,'name') || '').trim()===name);
+}
+function finish(payload) { try { done(payload); } catch (_) {} }
+
+const character=findCharacter();
+if (!character) { finish({ok:false,reason:'character_not_found'}); return; }
+const collection=character.attribs;
+if (!collection) { finish({ok:false,reason:'attribute_collection_unavailable'}); return; }
+const current=String(spec.current == null ? '' : spec.current);
+const max=String(spec.max == null ? '' : spec.max);
+
+try {
+  const existing=named(collection,attrName);
+  if (existing.length > 1) { finish({ok:false,reason:'duplicate_attribute',count:existing.length}); return; }
+  if (existing.length === 1) {
+    const model=existing[0];
+    const before=String(val(model,'current') == null ? '' : val(model,'current'));
+    const beforeMax=String(val(model,'max') == null ? '' : val(model,'max'));
+    if (before===current && beforeMax===max) { finish({ok:true,action:'skip',id:idOf(model)}); return; }
+    model.save({current:current,max:max},{wait:false});
+    finish({ok:true,action:'update_dispatched',id:idOf(model)});
+    return;
+  }
+  const model=collection.create({name:attrName,current:current,max:max,characterid:wantedId},{wait:false});
+  finish({ok:true,action:'create_dispatched',id:idOf(model)});
+} catch(e) {
+  finish({ok:false,reason:'dispatch_exception',error:String(e && e.stack ? e.stack : e)});
+}
+"""
+
+
+def _attribute_batches(attrs, size=WRITE_BATCH_SIZE):
+    items = list(attrs.items())
+    return [dict(items[index:index + size]) for index in range(0, len(items), size)]
+
+
+def _poll_attribute(driver, target, name, spec, attempts=8, delay=0.5):
+    expected = {name: spec}
+    last_mismatches = []
+    for attempt in range(1, attempts + 1):
+        snapshot = _snapshot(driver, target, [name])
+        actual, mismatches = _verify(snapshot, expected)
+        last_mismatches = mismatches
+        if not mismatches:
+            return actual[name], attempt
+        if attempt < attempts:
+            time.sleep(delay)
+    raise RuntimeError(
+        "11단계 숙련 서버 반영 확인 실패: "
+        + json.dumps(last_mismatches, ensure_ascii=False)
+    )
+
+
+def _repair_attribute(driver, target, name, spec):
+    driver.set_script_timeout(30)
     outcome = driver.execute_async_script(
-        UPSERT_ROW_SCRIPT,
+        STAGE11_NO_WAIT_ATTR_SCRIPT,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
-        attrs,
+        name,
+        spec,
     )
     if not isinstance(outcome, dict) or not outcome.get("ok"):
         raise RuntimeError(
-            "11단계 숙련 저장 실패: "
-            + json.dumps(outcome, ensure_ascii=False)
+            "11단계 숙련 복구 저장 실패: "
+            + json.dumps({"attribute": name, "outcome": outcome}, ensure_ascii=False)
+        )
+    actual, attempts = _poll_attribute(driver, target, name, spec)
+    return {
+        "attribute": name,
+        "outcome": outcome,
+        "persisted_verify_attempts": attempts,
+        "actual": actual,
+    }
+
+
+def _upsert_and_verify(driver, target, attrs):
+    batch_results = []
+
+    for batch_index, batch in enumerate(_attribute_batches(attrs), start=1):
+        driver.set_script_timeout(60)
+        outcome = driver.execute_async_script(
+            UPSERT_ROW_SCRIPT,
+            _text(target.get("roll20_character_id")),
+            _text(target.get("character_name")),
+            batch,
         )
 
-    after = _snapshot(driver, target, attrs.keys())
-    actual, mismatches = _verify(after, attrs)
+        after = _snapshot(driver, target, batch.keys())
+        _, mismatches = _verify(after, batch)
+        repairs = []
+        if mismatches:
+            for mismatch in mismatches:
+                name = _text(_dict(mismatch).get("attribute"))
+                if name and name in batch:
+                    repairs.append(_repair_attribute(driver, target, name, batch[name]))
+            after = _snapshot(driver, target, batch.keys())
+            _, mismatches = _verify(after, batch)
+
+        if mismatches:
+            raise RuntimeError(
+                "11단계 숙련 서버 재검증 실패: "
+                + json.dumps(
+                    {"batch": batch_index, "writer_outcome": outcome, "mismatches": mismatches},
+                    ensure_ascii=False,
+                )
+            )
+
+        batch_results.append({
+            "batch": batch_index,
+            "attribute_count": len(batch),
+            "writer_outcome": outcome,
+            "repairs": repairs,
+        })
+
+    final_snapshot = _snapshot(driver, target, attrs.keys())
+    actual, mismatches = _verify(final_snapshot, attrs)
+    if mismatches:
+        repairs = []
+        for mismatch in mismatches:
+            name = _text(_dict(mismatch).get("attribute"))
+            if name and name in attrs:
+                repairs.append(_repair_attribute(driver, target, name, attrs[name]))
+        final_snapshot = _snapshot(driver, target, attrs.keys())
+        actual, mismatches = _verify(final_snapshot, attrs)
+        batch_results.append({
+            "batch": "final_repair",
+            "attribute_count": len(repairs),
+            "writer_outcome": {"ok": True, "action": "persisted_repair"},
+            "repairs": repairs,
+        })
+
     if mismatches:
         raise RuntimeError(
-            "11단계 숙련 서버 재검증 실패: "
+            "11단계 숙련 최종 서버 재검증 실패: "
             + json.dumps(mismatches, ensure_ascii=False)
         )
-    return outcome, actual
+
+    return {"ok": True, "batch_size": WRITE_BATCH_SIZE, "batches": batch_results}, actual
 
 
 def _delete_stale_rows(driver, target, stale_targets):

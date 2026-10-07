@@ -42,7 +42,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE7_VERSION = "2026-10-06-stage7-roll20-spells-v2-combat-fields"
+STAGE7_VERSION = "2026-10-07-stage7-roll20-spells-v2.1-grouped-source-damage"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -132,26 +132,36 @@ _ABILITY_BY_ID = {
 
 
 def _raw_spell_definitions(result_payload):
-    """Return D&D Beyond raw spell definitions keyed by character spell id."""
+    """Return raw DDB spell definitions keyed by character spell id.
+
+    D&D Beyond exposes ordinary class-list spells under classSpells[*].spells,
+    while race/class/background/item/feat granted spells can live inside a
+    grouped top-level spells object. Moonbeam in the current multiclass sample
+    is one of those grouped spells.
+    """
     raw_source = _dict(_dict(result_payload).get("raw_source"))
     out = {}
 
-    for class_spell_group in _list(raw_source.get("classSpells")):
-        class_spell_group = _dict(class_spell_group)
-        for spell in _list(class_spell_group.get("spells")):
+    def add_spells(entries, *, overwrite=False):
+        for spell in _list(entries):
             spell = _dict(spell)
             source_id = _text(spell.get("id"))
             definition = _dict(spell.get("definition"))
-            if source_id and definition:
+            if not source_id or not definition:
+                continue
+            if overwrite or source_id not in out:
                 out[source_id] = definition
 
-    # Compatibility fallback if a future result exposes top-level spells.
-    for spell in _list(raw_source.get("spells")):
-        spell = _dict(spell)
-        source_id = _text(spell.get("id"))
-        definition = _dict(spell.get("definition"))
-        if source_id and definition:
-            out[source_id] = definition
+    for class_spell_group in _list(raw_source.get("classSpells")):
+        class_spell_group = _dict(class_spell_group)
+        add_spells(class_spell_group.get("spells"), overwrite=True)
+
+    grouped = raw_source.get("spells")
+    if isinstance(grouped, dict):
+        for entries in grouped.values():
+            add_spells(entries)
+    else:
+        add_spells(grouped)
 
     return out
 
@@ -257,14 +267,34 @@ def _spell_combat_profile(item, raw_definition=None):
         ]
         # DDB spell-scale entries use the base spell level as the "per slot
         # above base" delta. Thunderwave: level 1 -> +1d8.
+        # Leveled-spell modifiers normally encode the per-slot-above-base
+        # increment as level=1, even for a base 2nd-level spell such as
+        # Moonbeam or Heat Metal. Keep the previous interpretation as a
+        # compatibility fallback for older payload shapes.
         delta = next(
             (
                 row for row in higher
-                if row.get("level") == level
+                if row.get("level") == 1
                 and _dict(row.get("dice")).get("diceString")
             ),
             None,
         )
+        if delta is None:
+            delta = next(
+                (
+                    row for row in higher
+                    if row.get("level") == level
+                    and _dict(row.get("dice")).get("diceString")
+                ),
+                None,
+            )
+        if delta is None:
+            dice_rows = [
+                row for row in higher
+                if _dict(row.get("dice")).get("diceString")
+            ]
+            if len(dice_rows) == 1:
+                delta = dice_rows[0]
         if delta:
             delta_dice = _dict(delta.get("dice"))
             higher_die_count = _scalar(delta_dice.get("diceCount"))
@@ -741,6 +771,8 @@ def build_spell_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
             "stable_row_ids": True,
             "spelloutput": "combat-aware",
             "combat_fields_prepared": True,
+            "grouped_raw_spell_sources": True,
+            "leveled_spell_scaling_delta": True,
             "create_attacks": False,
         },
         "deferred": [
