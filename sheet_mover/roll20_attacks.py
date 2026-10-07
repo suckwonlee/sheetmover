@@ -1029,5 +1029,13 @@ def main():
     print(f"[시트 이동기] 결과 저장: {output.resolve()}")
 
 
+# runtime-integrity-v2.6 attack hook
+from .runtime_integrity_v26 import install_attack_integrity as _install_attack_integrity_v26
+map_weapon_attack, build_attack_plan = _install_attack_integrity_v26(
+    map_weapon_attack,
+    build_attack_plan,
+    globals(),
+)
+
 if __name__ == "__main__":
     main()

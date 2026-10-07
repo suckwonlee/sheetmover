@@ -1311,5 +1311,9 @@ def main():
     print(f"[시트 이동기] 결과 저장: {output.resolve()}")
 
 
+# runtime-integrity-v2.6 feature hook
+from .runtime_integrity_v26 import install_feature_integrity as _install_feature_integrity_v26
+build_feature_plan = _install_feature_integrity_v26(build_feature_plan, globals())
+
 if __name__ == "__main__":
     main()

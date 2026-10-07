@@ -41,7 +41,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE12_VERSION = "2026-10-06-stage12-roll20-resources-v1.2-rest-reset"
+STAGE12_VERSION = "2026-10-07-stage12-roll20-resources-v1.3-ability-modifier-uses"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -106,8 +106,24 @@ def _resource_source_key(item, index):
     return f"resource:{kind}:fallback:{digest}"
 
 
-def _max_uses(limited_use, proficiency_bonus):
+STAT_ID_TO_ABILITY = {
+    1: "strength",
+    2: "dexterity",
+    3: "constitution",
+    4: "intelligence",
+    5: "wisdom",
+    6: "charisma",
+}
+
+
+def _ability_modifier(score):
+    score = _as_int(score, 10)
+    return (score - 10) // 2
+
+
+def _max_uses(limited_use, proficiency_bonus, ability_scores=None):
     limited_use = _dict(limited_use)
+    ability_scores = _dict(ability_scores)
     raw_max = limited_use.get("maxUses")
 
     if raw_max not in (None, ""):
@@ -115,10 +131,11 @@ def _max_uses(limited_use, proficiency_bonus):
         if maximum > 0:
             return maximum
 
-    # Some DDB limited-use definitions are proficiency-bonus based and may
-    # omit maxUses. Do not guess operator arithmetic when DDB already supplied
-    # a concrete maxUses; only use PB as the safe fallback when maxUses is
-    # absent.
+    stat_id = _as_int(limited_use.get("statModifierUsesId"), 0)
+    ability = STAT_ID_TO_ABILITY.get(stat_id)
+    if ability and ability in ability_scores:
+        return max(1, _ability_modifier(ability_scores.get(ability)))
+
     if limited_use.get("useProficiencyBonus") is True:
         return max(0, _as_int(proficiency_bonus, 0))
 
@@ -151,9 +168,11 @@ def build_resource_candidates(result_payload: dict[str, Any]):
     roll20_payload = _dict(_dict(result_payload).get("roll20_payload"))
     character = _dict(roll20_payload.get("character"))
     proficiency_bonus = _as_int(character.get("proficiency_bonus"), 0)
+    ability_scores = _dict(character.get("ability_scores"))
 
     candidates = []
     seen = set()
+    semantic_seen = set()
 
     for index, raw in enumerate(_resource_values(result_payload)):
         item = _dict(raw)
@@ -161,7 +180,7 @@ def build_resource_candidates(result_payload: dict[str, Any]):
         if not limited:
             continue
 
-        maximum = _max_uses(limited, proficiency_bonus)
+        maximum = _max_uses(limited, proficiency_bonus, ability_scores)
         if maximum <= 0:
             continue
 
@@ -176,6 +195,21 @@ def build_resource_candidates(result_payload: dict[str, Any]):
         name = _text(item.get("name") or item.get("original_name"))
         if not name:
             raise RuntimeError(f"자원 이름이 비어 있습니다: {source_key}")
+
+        semantic_key = (
+            _text(item.get("kind")).casefold(),
+            _text(item.get("original_name") or name).casefold(),
+            maximum,
+            used,
+            limited.get("resetType"),
+            limited.get("statModifierUsesId"),
+            limited.get("useProficiencyBonus"),
+            limited.get("proficiencyBonusOperator"),
+            limited.get("operator"),
+        )
+        if semantic_key in semantic_seen:
+            continue
+        semantic_seen.add(semantic_key)
 
         candidates.append({
             "source_key": source_key,
@@ -718,6 +752,16 @@ def apply_resources(
         raise RuntimeError("D&D Beyond 결과와 Roll20 대상 캐릭터 이름이 다릅니다.")
 
     candidates = build_resource_candidates(payload)
+    if candidates:
+        summary = ", ".join(
+            f"{row['name']} {row['current']}/{row['maximum']} "
+            f"({row.get('roll20_reset') or '휴식 없음'})"
+            for row in candidates
+        )
+        print(f"[시트 이동기] 자원 후보 {len(candidates)}개: {summary}")
+    else:
+        print("[시트 이동기] 자원 후보 0개")
+
     output_path = (
         Path(CURRENT_RESULT_DIR)
         / f"roll20-resources-{actual_source_id}.json"
@@ -982,6 +1026,10 @@ def main():
         )
     print(f"[시트 이동기] 결과 저장: {output.resolve()}")
 
+
+# runtime-integrity-v2.6 resource-cleanup hook
+from .runtime_integrity_v26 import install_resource_integrity as _install_resource_integrity_v26
+apply_resources = _install_resource_integrity_v26(apply_resources, globals())
 
 if __name__ == "__main__":
     main()

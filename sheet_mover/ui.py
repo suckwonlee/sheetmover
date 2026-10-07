@@ -39,6 +39,35 @@ OLLAMA_DOWNLOAD_URL = "https://ollama.com/download/windows"
 DEFAULT_SOURCE_URL = "https://www.dndbeyond.com/characters/170892133"
 
 
+def _cleanup_old_worker_protocol_files(workers_root):
+    root = Path(workers_root)
+    if not root.is_dir():
+        return 0
+
+    removed = 0
+    for folder in root.iterdir():
+        if not folder.is_dir():
+            continue
+        for name in ("events.jsonl", "settings.json"):
+            path = folder / name
+            try:
+                if path.is_file():
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                pass
+    return removed
+
+
+def _ui_progress_is_noisy(message):
+    value = str(message or "").strip()
+    return bool(
+        value.startswith("번역 ")
+        and value.endswith("(배치 처리)")
+        and "/" in value
+    )
+
+
 class SheetMoverUI(tk.Tk):
     def __init__(self, source_url=DEFAULT_SOURCE_URL):
         super().__init__()
@@ -473,8 +502,15 @@ class SheetMoverUI(tk.Tk):
             )
             return
 
+        workers_root = data_dir() / "workers"
+        removed_ipc = _cleanup_old_worker_protocol_files(workers_root)
+        if removed_ipc:
+            self.log(
+                f"이전 실행의 임시 IPC 파일 {removed_ipc}개를 정리했습니다."
+            )
+
         run_id = uuid4().hex
-        run_folder = data_dir() / "workers" / run_id
+        run_folder = workers_root / run_id
         try:
             snapshot_path = save_settings(self.settings, run_folder / "settings.json")
         except OSError as exc:
@@ -538,8 +574,10 @@ class SheetMoverUI(tk.Tk):
         kind = event.get("type")
         if kind == "progress":
             self.progress_var.set(min(99, max(0, float(event.get("percent") or 0))))
-            self.progress_text.set(str(event.get("message") or ""))
-            self.log(event.get("message") or "")
+            message = str(event.get("message") or "")
+            self.progress_text.set(message)
+            if not _ui_progress_is_noisy(message):
+                self.log(message)
         elif kind == "stage":
             index = int(event.get("index") or 0)
             item = self.stage_items.get(index)

@@ -925,3 +925,10 @@ def apply_stage2_calculations(sheet):
         )
 
     return sheet
+
+# runtime-integrity-v2.6 AC hook
+from .runtime_integrity_v26 import install_ac_integrity as _install_ac_integrity_v26
+_calculate_armor_class = _install_ac_integrity_v26(
+    _calculate_armor_class,
+    globals(),
+)

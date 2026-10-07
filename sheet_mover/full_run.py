@@ -6,6 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 import json
 from pathlib import Path
+import re
 import sys
 import time
 import traceback
@@ -16,7 +17,7 @@ from .app_config import (
     data_dir, load_settings, validate_settings,
 )
 
-FULL_RUN_VERSION = "2026-10-07-stage13-full-run-v2.4-final-ui-refresh"
+FULL_RUN_VERSION = "2026-10-07-stage13-full-run-v2.5.2-diagnostic-log"
 STAGES = (
     "D&D Beyond 수집 · 번역 · 계산", "Roll20 대상 확인", "기본 능력치",
     "인벤토리", "주문", "특성", "무기 공격", "주문 공격", "숙련", "자원",
@@ -186,6 +187,110 @@ def _refresh_roll20_views(cdp_url: str, timeout: float = 30.0):
             except Exception:
                 pass
         _disconnect_driver(driver)
+
+
+
+_BATCH_PROGRESS_RE = re.compile(r"^번역 \d+/\d+ \(배치 처리\)$")
+_NOISY_STDOUT_RE = re.compile(
+    r"^\[시트 이동기\] (?:주문|특성|주문 공격) \d+/\d+:"
+)
+
+
+def _diagnostic_event_lines(event):
+    if not isinstance(event, dict):
+        return []
+
+    kind = str(event.get("type") or "")
+    message = str(event.get("message") or "").strip()
+
+    if kind == "progress":
+        if not message or _BATCH_PROGRESS_RE.match(message):
+            return []
+        return [f"[진행] {message}"]
+
+    if kind == "stage":
+        status_label = {
+            "running": "시작",
+            "pass": "완료",
+            "error": "실패",
+        }.get(
+            str(event.get("status") or ""),
+            str(event.get("status") or ""),
+        )
+        index = event.get("index")
+        total = event.get("total")
+        name = str(event.get("name") or "").strip() or "단계"
+        prefix = (
+            f"[단계 {index}/{total}]"
+            if index and total
+            else f"[단계 {index}]"
+            if index
+            else "[단계]"
+        )
+        line = f"{prefix} {name}: {status_label}".rstrip()
+        if message:
+            line += f" - {message}"
+        return [line]
+
+    if kind == "complete":
+        return ["[완료] Roll20 시트 이동 완료"]
+
+    if kind == "error":
+        lines = [f"[오류] {message or '알 수 없는 오류'}"]
+        trace = str(event.get("traceback") or "").strip()
+        if trace:
+            lines.append("[오류 상세]")
+            lines.extend(trace.splitlines())
+        report = str(event.get("report") or "").strip()
+        if report:
+            lines.append(f"[오류 보고서] {report}")
+        for value in event.get("save_errors") or []:
+            lines.append(f"[저장 오류] {value}")
+        return lines
+
+    return []
+
+
+def _keep_runtime_stdout_line(line):
+    value = str(line or "").strip()
+    if not value:
+        return False
+    if _NOISY_STDOUT_RE.match(value):
+        return False
+    if value == "[시트 이동기] 특성 표시 순서를 정리합니다.":
+        return False
+    return True
+
+
+class _DiagnosticLogStream:
+    def __init__(self, sink):
+        self.sink = sink
+        self.buffer = ""
+
+    def write(self, value):
+        value = str(value)
+        self.buffer += value
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            if _keep_runtime_stdout_line(line):
+                self.sink.write(line + "\n")
+        return len(value)
+
+    def flush(self):
+        self.sink.flush()
+
+    def finish(self):
+        if self.buffer:
+            if _keep_runtime_stdout_line(self.buffer):
+                self.sink.write(self.buffer + "\n")
+            self.buffer = ""
+        self.sink.flush()
+
+
+def _write_diagnostic_event(log, event):
+    for line in _diagnostic_event_lines(event):
+        log.write(line + "\n")
+    log.flush()
 
 
 def _emit_stdout(event: dict):
@@ -469,9 +574,29 @@ def cli_main(argv=None):
     if args.events:
         from .worker_protocol import EventWriter
         writer = EventWriter(args.events, args.run_id)
-        with Path(args.log).open("w", encoding="utf-8", buffering=1) as log:
-            with redirect_stdout(log), redirect_stderr(log):
-                return execute(writer.emit)
+        log_path = Path(args.log)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with log_path.open("w", encoding="utf-8", buffering=1) as raw_log:
+            stream = _DiagnosticLogStream(raw_log)
+
+            def emit(event):
+                writer.emit(event)
+                _write_diagnostic_event(raw_log, event)
+
+            raw_log.write(
+                f"[실행] 시작 · run_id={args.run_id or '없음'}\n"
+            )
+            try:
+                with redirect_stdout(stream), redirect_stderr(stream):
+                    code = execute(emit)
+            finally:
+                stream.finish()
+
+            raw_log.write(f"[실행] 종료 · exit_code={code}\n")
+            raw_log.flush()
+            return code
+
     return execute(_emit_stdout)
 
 

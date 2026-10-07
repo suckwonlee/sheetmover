@@ -1031,5 +1031,9 @@ def main():
     print(f"[시트 이동기] 결과 저장: {output.resolve()}")
 
 
+# runtime-integrity-v2.6 Stage 5 cache-refresh hook
+from sheet_mover.runtime_integrity_v26 import install_basic_plan_integrity as _install_basic_plan_integrity_v26
+build_plan = _install_basic_plan_integrity_v26(build_plan, globals())
+
 if __name__ == "__main__":
     main()
