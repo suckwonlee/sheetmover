@@ -5,16 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/README_RUNTIME_INTEGRITY_V24.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_RUNTIME_V242_REPAIR.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_V241_REPAIR.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_runtime_integrity_v24.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/repair_and_apply_runtime_v241.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/repair_and_apply_runtime_v242.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_RUNTIME_INTEGRITY_V25.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_RUNTIME_INTEGRITY_V251.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_runtime_integrity_v25.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_runtime_integrity_v251.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/ui.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_full_run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -289,7 +284,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791355567700</updated>
     </task>
-    <option name="localTasksCounter" value="21" />
+    <task id="LOCAL-00021" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791360261544</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1791360261544</updated>
+    </task>
+    <option name="localTasksCounter" value="22" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
