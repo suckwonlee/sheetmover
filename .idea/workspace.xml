@@ -5,27 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/README_STAGE13_V2_1.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_STAGE5_MULTICLASS_V1.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V17.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V171.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V172.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V173.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage13_v2_1.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage5_multiclass_v1.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v17.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v171.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v172.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v173.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage5_multiclass.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage8_integrity_v17.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE10B_V11.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE10B_V12.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage10b_v11_sequential.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage10b_v12_rollcontent_dispatch.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/patch_files/test_stage10b_sequential_hotfix.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage10b_rollcontent_dispatch.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_features.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/source.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/source.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage5_basic_writer_v2.py" beforeDir="false" afterPath="$PROJECT_DIR$/stage5_basic_writer_v2.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_full_run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_preparation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_preparation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -268,7 +255,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791286348660</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791350221985</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1791350221985</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

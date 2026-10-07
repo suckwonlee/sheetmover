@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -42,7 +43,7 @@ from .roll20_spells import (
 )
 
 
-STAGE10B_VERSION = "2026-10-06-stage10b-roll20-spell-attacks-v1"
+STAGE10B_VERSION = "2026-10-07-stage10b-roll20-spell-attacks-v1.2-rollcontent-dispatch"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -114,6 +115,237 @@ SPELL_COMBAT_FIELDS = (
     "spellattackid",
     "rollcontent",
 )
+
+
+def _build_sequential_spell_upsert_script():
+    """ATTACK 주문의 sibling repeating-spell 필드를 순차 저장합니다."""
+    script = UPSERT_ROW_SCRIPT
+    jobs_marker = "    const jobs=[];\n\n"
+    push_marker = """      jobs.push(
+        existing.length===1
+          ? saveExisting(existing[0],name,spec)
+          : createNew(collection,name,spec)
+      );
+"""
+    finish_marker = """    const completed=await Promise.all(jobs);
+    log.push(...completed);
+"""
+
+    for label, needle in (("jobs", jobs_marker), ("push", push_marker), ("finish", finish_marker)):
+        if needle not in script:
+            raise RuntimeError(f"공용 Roll20 upsert 스크립트 구조가 변경되었습니다: {label}")
+
+    script = script.replace(jobs_marker, "", 1)
+    script = script.replace(
+        push_marker,
+        """      log.push(
+        existing.length===1
+          ? await saveExisting(existing[0],name,spec)
+          : await createNew(collection,name,spec)
+      );
+""",
+        1,
+    )
+    script = script.replace(finish_marker, "    await fetchCollection(collection);\n", 1)
+    return script
+
+
+SPELL_LINK_UPSERT_SEQUENTIAL_SCRIPT = _build_sequential_spell_upsert_script()
+
+
+
+ROLLCONTENT_DISPATCH_SCRIPT = r"""
+const wantedId = String(arguments[0] || '').trim();
+const wantedName = String(arguments[1] || '').trim();
+const attrName = String(arguments[2] || '').trim();
+const spec = arguments[3] || {};
+const done = arguments[arguments.length - 1];
+
+function val(obj,key) {
+  try {
+    if (!obj) return null;
+    if (obj.attributes && obj.attributes[key] != null) return obj.attributes[key];
+    if (typeof obj.get === 'function') {
+      const v=obj.get(key); if (v != null) return v;
+    }
+    if (obj[key] != null) return obj[key];
+  } catch (_) {}
+  return null;
+}
+function modelsOf(c) {
+  try {
+    if (!c) return [];
+    if (Array.isArray(c.models)) return c.models;
+    if (typeof c.toArray === 'function') return c.toArray();
+    if (Array.isArray(c)) return c;
+  } catch (_) {}
+  return [];
+}
+function idOf(m) {
+  return String(
+    val(m,'id') || val(m,'_id') || val(m,'characterid') || (m && m.id) || ''
+  ).trim();
+}
+function findCharacter() {
+  const campaigns=[];
+  try { if (window.d20 && window.d20.Campaign) campaigns.push(window.d20.Campaign); } catch (_) {}
+  try { if (window.Campaign) campaigns.push(window.Campaign); } catch (_) {}
+  for (const campaign of campaigns) {
+    const collections=[
+      campaign.characters,
+      campaign.attributes && campaign.attributes.characters,
+    ];
+    for (const collection of collections) {
+      for (const model of modelsOf(collection)) {
+        const id=idOf(model);
+        const name=String(val(model,'name') || '').trim();
+        if ((wantedId && id===wantedId) ||
+            (!wantedId && wantedName && name===wantedName)) return model;
+      }
+    }
+  }
+  return null;
+}
+function modelsNamed(collection,name) {
+  return modelsOf(collection).filter(
+    m=>String(val(m,'name') || '').trim()===name
+  );
+}
+function finish(payload) {
+  try { done(payload); } catch (_) {}
+}
+
+const character=findCharacter();
+if (!character) {
+  finish({ok:false,reason:'character_not_found'});
+  return;
+}
+const collection=character.attribs;
+if (!collection) {
+  finish({ok:false,reason:'attribute_collection_unavailable'});
+  return;
+}
+
+const current=String(spec.current == null ? '' : spec.current);
+const max=String(spec.max == null ? '' : spec.max);
+
+try {
+  const existing=modelsNamed(collection,attrName);
+  if (existing.length > 1) {
+    finish({ok:false,reason:'duplicate_attribute',count:existing.length});
+    return;
+  }
+
+  if (existing.length === 1) {
+    const model=existing[0];
+    const before=String(val(model,'current') == null ? '' : val(model,'current'));
+    const beforeMax=String(val(model,'max') == null ? '' : val(model,'max'));
+    if (before===current && beforeMax===max) {
+      finish({ok:true,action:'skip',id:idOf(model)});
+      return;
+    }
+
+    model.save(
+      {current:current,max:max},
+      {wait:false}
+    );
+    finish({
+      ok:true,
+      action:'update_dispatched',
+      id:idOf(model),
+      before:before,
+      current:current,
+    });
+    return;
+  }
+
+  const model=collection.create(
+    {
+      name:attrName,
+      current:current,
+      max:max,
+      characterid:wantedId,
+    },
+    {wait:false}
+  );
+  finish({
+    ok:true,
+    action:'create_dispatched',
+    id:idOf(model),
+    current:current,
+  });
+} catch(e) {
+  finish({
+    ok:false,
+    reason:'dispatch_exception',
+    error:String(e && e.stack ? e.stack : e),
+  });
+}
+"""
+
+
+def _split_rollcontent_attrs(attrs):
+    normal = {}
+    rollcontent = {}
+    for name, spec in attrs.items():
+        if name.endswith("_rollcontent"):
+            rollcontent[name] = spec
+        else:
+            normal[name] = spec
+    return normal, rollcontent
+
+
+def _poll_persisted(driver, target, attrs, label, attempts=8, delay=0.75):
+    last_mismatches = []
+    for attempt in range(1, attempts + 1):
+        after = _snapshot(driver, target, attrs.keys())
+        actual, mismatches = _verify(after, attrs)
+        last_mismatches = mismatches
+        if not mismatches:
+            return actual, attempt
+        if attempt < attempts:
+            time.sleep(delay)
+
+    raise RuntimeError(
+        f"{label} 서버 재검증 실패: "
+        + json.dumps(last_mismatches, ensure_ascii=False)
+    )
+
+
+def _write_rollcontent_and_verify(driver, target, attrs, label):
+    if not attrs:
+        return {"ok": True, "action": "none"}, {}
+
+    if len(attrs) != 1:
+        raise RuntimeError(
+            f"{label}: rollcontent 속성은 한 번에 1개여야 합니다. "
+            f"현재 {len(attrs)}개"
+        )
+
+    name, spec = next(iter(attrs.items()))
+    driver.set_script_timeout(30)
+    outcome = driver.execute_async_script(
+        ROLLCONTENT_DISPATCH_SCRIPT,
+        _text(target.get("roll20_character_id")),
+        _text(target.get("character_name")),
+        name,
+        spec,
+    )
+    if not isinstance(outcome, dict) or not outcome.get("ok"):
+        raise RuntimeError(
+            f"{label} dispatch 실패: "
+            + json.dumps(outcome, ensure_ascii=False)
+        )
+
+    actual, attempts = _poll_persisted(
+        driver,
+        target,
+        attrs,
+        label,
+    )
+    outcome = dict(outcome)
+    outcome["persisted_verify_attempts"] = attempts
+    return outcome, actual
 
 
 def spell_attack_row_id(source_key: str) -> str:
@@ -366,6 +598,10 @@ def build_spell_attack_plan(result_payload):
             "use_roll20_attack_output_semantics": True,
             "deterministic_spell_attack_ids": True,
             "as_part_of_weapon_attack_stays_spellcard": True,
+            "rollcontent_no_wait_dispatch": True,
+            "rollcontent_persisted_poll_verify": True,
+            "sequential_spell_link_writes": True,
+            "persisted_state_wins_over_save_callback_timeout": True,
         },
     }
 
@@ -387,15 +623,50 @@ def _load_target(source_id: str):
     return payload, path
 
 
-def _upsert_and_verify(driver, target, attrs, label):
-    driver.set_script_timeout(45)
+def _upsert_and_verify(driver, target, attrs, label, *, sequential=False):
+    script = SPELL_LINK_UPSERT_SEQUENTIAL_SCRIPT if sequential else UPSERT_ROW_SCRIPT
+    driver.set_script_timeout(120 if sequential else 45)
     outcome = driver.execute_async_script(
-        UPSERT_ROW_SCRIPT,
+        script,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
         attrs,
     )
+
+    # Roll20이 실제 저장은 끝냈지만 Backbone save callback만 반환하지 않는 경우가 있습니다.
+    # 이때는 서버 persisted read를 최종 진실로 사용합니다.
     if not isinstance(outcome, dict) or not outcome.get("ok"):
+        after = _snapshot(driver, target, attrs.keys())
+        actual, mismatches = _verify(after, attrs)
+        if not mismatches:
+            return {
+                "ok": True,
+                "recovered_after_upsert_error": True,
+                "original_outcome": outcome,
+            }, actual
+
+        if sequential:
+            retry = driver.execute_async_script(
+                script,
+                _text(target.get("roll20_character_id")),
+                _text(target.get("character_name")),
+                attrs,
+            )
+            after = _snapshot(driver, target, attrs.keys())
+            actual, mismatches = _verify(after, attrs)
+            if not mismatches:
+                return {
+                    "ok": True,
+                    "recovered_after_retry": True,
+                    "original_outcome": outcome,
+                    "retry_outcome": retry,
+                }, actual
+            outcome = {
+                "first": outcome,
+                "retry": retry,
+                "mismatches": mismatches,
+            }
+
         raise RuntimeError(
             f"{label} 저장 실패: "
             + json.dumps(outcome, ensure_ascii=False)
@@ -532,15 +803,37 @@ def apply_spell_attacks(
         for spell_row in plan["spell_rows"]:
             attack_row = attack_by_source.get(spell_row["source_key"])
             attack_id = attack_row["attack_row_id"] if attack_row else None
-            _upsert_and_verify(
+            spell_attrs = _spell_combat_attributes(
+                spell_row,
+                character_id,
+                attack_id,
+            )
+            normal_attrs, rollcontent_attrs = _split_rollcontent_attrs(
+                spell_attrs
+            )
+
+            if normal_attrs:
+                try:
+                    _upsert_and_verify(
+                        driver,
+                        target,
+                        normal_attrs,
+                        f"주문 출력 '{spell_row['name']}'",
+                        sequential=True,
+                    )
+                except TypeError:
+                    _upsert_and_verify(
+                        driver,
+                        target,
+                        normal_attrs,
+                        f"주문 출력 '{spell_row['name']}'",
+                    )
+
+            _write_rollcontent_and_verify(
                 driver,
                 target,
-                _spell_combat_attributes(
-                    spell_row,
-                    character_id,
-                    attack_id,
-                ),
-                f"주문 출력 '{spell_row['name']}'",
+                rollcontent_attrs,
+                f"주문 출력 '{spell_row['name']}' rollcontent",
             )
             report["mutated"] = True
 
