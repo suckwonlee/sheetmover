@@ -15,7 +15,7 @@ from .app_config import (
     data_dir, load_settings, validate_settings,
 )
 
-FULL_RUN_VERSION = "2026-10-06-stage13-full-run-v2"
+FULL_RUN_VERSION = "2026-10-06-stage13-full-run-v2.1-soft-fallback"
 STAGES = (
     "D&D Beyond 수집 · 번역 · 계산", "Roll20 대상 확인", "기본 능력치",
     "인벤토리", "주문", "특성", "무기 공격", "주문 공격", "숙련", "자원",
@@ -113,14 +113,38 @@ def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=N
         if not source_id:
             raise RuntimeError("D&D Beyond source ID를 확인하지 못했습니다.")
         summary = payload.get("translation_summary") or {}
-        if summary.get("status") != "complete":
-            raise RuntimeError("번역이 미완성이므로 Roll20 입력을 중단합니다. "
-                               f"원문 유지 {summary.get('original_preserved_count', 0)}개")
+        translation_status = str(summary.get("status") or "").strip()
+        preserved_count = int(summary.get("original_preserved_count") or 0)
+        state["translation_summary"] = summary
+
+        # translate_character() returning normally means unsafe fragments were
+        # already replaced by their exact English source text. That is a safe
+        # soft fallback, not corrupted data. A real TranslationError still
+        # follows the exception path and stops before Roll20 mutation.
+        if translation_status not in {"complete", "partial"}:
+            raise RuntimeError(
+                "번역 결과 상태를 확인할 수 없어 Roll20 입력을 중단합니다. "
+                f"상태={translation_status or '없음'}"
+            )
+
         result_path = default_result_path(source_id, root=data_dir())
         _write_json(result_path, payload)
         state["paths"]["sheet_result"] = str(result_path.resolve())
-        stage(1, "pass", f"결과 저장: {result_path.name}")
-        overall(30, "D&D Beyond 준비 완료")
+
+        if translation_status == "partial":
+            stage(
+                1,
+                "pass",
+                f"원문 {preserved_count}개를 안전하게 유지하고 계속 진행합니다. "
+                f"결과 저장: {result_path.name}",
+            )
+            overall(
+                30,
+                f"D&D Beyond 준비 완료 · 원문 유지 {preserved_count}개",
+            )
+        else:
+            stage(1, "pass", f"결과 저장: {result_path.name}")
+            overall(30, "D&D Beyond 준비 완료")
 
         stage(2, "running")
         target, target_path = check_roll20_target(

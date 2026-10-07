@@ -41,7 +41,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE8_VERSION = "2026-10-06-stage8-roll20-features-v1.6-fighting-style-description"
+STAGE8_VERSION = "2026-10-07-stage8-roll20-features-v1.7.3-tag-helper-hotfix"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -568,6 +568,8 @@ def build_feature_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
             "delete_existing_rows": False,
             "delete_only_explicitly_excluded_managed_rows": True,
             "stable_row_ids": True,
+            "sequential_attribute_writes": True,
+            "remove_stale_sheetmover_rows": True,
             "write_limited_use": False,
             "create_resources": False,
             "collapse_rows": True,
@@ -806,6 +808,76 @@ function waitDestroy(model,name) {
 """
 
 
+
+_OWNED_TRAIT_ROW_RE = re.compile(r"^-SM[0-9a-f]{17}$")
+
+
+def _build_sequential_trait_upsert_script():
+    script = UPSERT_ROW_SCRIPT
+
+    jobs_marker = "    const jobs=[];\n\n"
+    push_marker = """      jobs.push(
+        existing.length===1
+          ? saveExisting(existing[0],name,spec)
+          : createNew(collection,name,spec)
+      );
+"""
+    finish_marker = """    const completed=await Promise.all(jobs);
+    log.push(...completed);
+"""
+
+    for label, needle in (
+        ("jobs 선언", jobs_marker),
+        ("jobs.push 블록", push_marker),
+        ("Promise.all 블록", finish_marker),
+    ):
+        if needle not in script:
+            raise RuntimeError(
+                f"공용 Roll20 upsert 스크립트 구조가 변경되었습니다: {label}"
+            )
+
+    script = script.replace(jobs_marker, "", 1)
+    script = script.replace(
+        push_marker,
+        """      log.push(
+        existing.length===1
+          ? await saveExisting(existing[0],name,spec)
+          : await createNew(collection,name,spec)
+      );
+""",
+        1,
+    )
+    script = script.replace(
+        finish_marker,
+        """    await fetchCollection(collection);
+""",
+        1,
+    )
+    return script
+
+
+TRAIT_UPSERT_SEQUENTIAL_SCRIPT = _build_sequential_trait_upsert_script()
+
+
+def _stale_sheetmover_row_ids(state, plan):
+    existing = [
+        _text(value)
+        for value in _list(_dict(state).get("row_ids"))
+        if _text(value)
+    ]
+    desired_or_known = {
+        _text(value)
+        for value in _list(_dict(plan).get("all_managed_row_ids"))
+        if _text(value)
+    }
+    return [
+        row_id
+        for row_id in existing
+        if _OWNED_TRAIT_ROW_RE.fullmatch(row_id)
+        and row_id not in desired_or_known
+    ]
+
+
 def _trait_state(driver, target):
     from .roll20_read import read_persisted
     return read_persisted(
@@ -848,7 +920,7 @@ def _is_complete(snapshot, attrs):
 def _upsert_and_verify(driver, target, attrs, label):
     driver.set_script_timeout(45)
     outcome = driver.execute_async_script(
-        UPSERT_ROW_SCRIPT,
+        TRAIT_UPSERT_SEQUENTIAL_SCRIPT,
         _text(target.get("roll20_character_id")),
         _text(target.get("character_name")),
         attrs,
@@ -869,12 +941,10 @@ def _upsert_and_verify(driver, target, attrs, label):
     return outcome, actual
 
 
-def _delete_excluded_rows(driver, target, plan):
-    row_ids = [
-        _text(row.get("row_id"))
-        for row in _list(plan.get("excluded_rows"))
-        if _text(row.get("row_id"))
-    ]
+def _delete_trait_row_ids(driver, target, row_ids, label):
+    row_ids = list(dict.fromkeys(
+        _text(row_id) for row_id in row_ids if _text(row_id)
+    ))
     if not row_ids:
         return {"ok": True, "deleted_count": 0, "deleted": []}
 
@@ -887,10 +957,23 @@ def _delete_excluded_rows(driver, target, plan):
     )
     if not isinstance(result, dict) or not result.get("ok"):
         raise RuntimeError(
-            "제외 특성행 삭제 실패: "
+            f"{label} 삭제 실패: "
             + json.dumps(result, ensure_ascii=False)
         )
     return result
+
+
+def _delete_excluded_rows(driver, target, plan):
+    return _delete_trait_row_ids(
+        driver,
+        target,
+        [
+            _text(row.get("row_id"))
+            for row in _list(plan.get("excluded_rows"))
+            if _text(row.get("row_id"))
+        ],
+        "제외 특성행",
+    )
 
 
 def _verify_excluded_absent(driver, target, plan):
@@ -945,6 +1028,7 @@ def apply_features(
         "row_count": plan["row_count"],
         "managed_attribute_count": len(active_attrs),
         "excluded_rows": plan["excluded_rows"],
+        "stale_owned_rows_before": [],
         "desired_managed_order": plan["desired_managed_order"],
         "policy": plan["policy"],
         "rows": plan["rows"],
@@ -986,6 +1070,10 @@ def apply_features(
             row for row in plan["excluded_rows"]
             if row["row_id"] in existing_ids
         ]
+        stale_owned_rows = _stale_sheetmover_row_ids(
+            state_before,
+            plan,
+        )
         desired_reporder = _build_reporder(state_before, plan)
         desired_reporder_value = ",".join(desired_reporder)
         current_reporder_value = _text(state_before.get("reporder"))
@@ -1001,6 +1089,7 @@ def apply_features(
             for row in pending_rows
         ]
         report["excluded_present_before"] = excluded_present
+        report["stale_owned_rows_before"] = stale_owned_rows
         report["desired_reporder"] = desired_reporder
         report["order_pending"] = order_pending
 
@@ -1034,13 +1123,23 @@ def apply_features(
         report["backup_path"] = str(backup_path.resolve())
         _save_json(output_path, report)
 
-        if excluded_present:
+        delete_row_ids = [
+            row["row_id"] for row in excluded_present
+        ] + stale_owned_rows
+        if delete_row_ids:
+            labels = [row["name"] for row in excluded_present]
+            labels.extend(stale_owned_rows)
             print(
-                "[시트 이동기] 제외 특성행을 정리합니다: "
-                + ", ".join(row["name"] for row in excluded_present),
+                "[시트 이동기] 제외/이전 특성행을 정리합니다: "
+                + ", ".join(labels),
                 flush=True,
             )
-            report["delete_result"] = _delete_excluded_rows(driver, target, plan)
+            report["delete_result"] = _delete_trait_row_ids(
+                driver,
+                target,
+                delete_row_ids,
+                "제외/이전 특성행",
+            )
             report["mutated"] = True
             _save_json(output_path, report)
 
@@ -1114,6 +1213,16 @@ def apply_features(
                 "rows": excluded_still_present,
             })
 
+        stale_still_present = _stale_sheetmover_row_ids(
+            state_final,
+            plan,
+        )
+        if stale_still_present:
+            mismatches.append({
+                "reason": "stale_sheetmover_rows_still_present",
+                "row_ids": stale_still_present,
+            })
+
         expected_order = final_reporder
         final_order = [
             part.strip()
@@ -1131,6 +1240,7 @@ def apply_features(
             "status": "pass" if not mismatches else "fail",
             "actual": actual,
             "excluded_rows_absent": not excluded_still_present,
+            "stale_owned_rows_absent": not stale_still_present,
             "final_reporder": final_order,
             "mismatches": mismatches,
             "server_fetch_status": final_snapshot.get("fetch_status"),

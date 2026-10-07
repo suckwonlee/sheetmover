@@ -6,6 +6,7 @@ fully calculate final ability scores, HP, AC, skills, attacks or resources.
 """
 from copy import deepcopy
 import re
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -165,6 +166,7 @@ def _normalize_class(entry):
         "name": name,
         "original_name": name,
         "level": _number(entry.get("level")),
+        "is_starting_class": bool(entry.get("isStartingClass", False)),
         "hit_die": _number(definition.get("hitDice")),
         "spellcasting_ability_id": spellcasting_ability_id,
         "spellcasting_ability_name": ABILITIES.get(spellcasting_ability_id),
@@ -485,7 +487,12 @@ DDB_CHARACTER_API = (
 )
 
 
-def fetch_character(source_url, timeout=20, opener=None):
+def fetch_character(
+    source_url,
+    timeout=20,
+    opener=None,
+    retry_delays=(1.0, 2.5),
+):
     """Fetch a D&D Beyond character using only its character URL."""
     character_id = source_character_id(source_url)
     endpoint = DDB_CHARACTER_API.format(character_id=character_id)
@@ -504,28 +511,44 @@ def fetch_character(source_url, timeout=20, opener=None):
     )
 
     open_request = opener or urlopen
-    try:
-        with open_request(request, timeout=timeout) as response:
-            status = getattr(response, "status", 200)
-            body = response.read()
-    except HTTPError as exc:
-        if exc.code in {401, 403, 404}:
+    delays = tuple(retry_delays or ())
+    retry_index = 0
+
+    while True:
+        try:
+            with open_request(request, timeout=timeout) as response:
+                status = getattr(response, "status", 200)
+                body = response.read()
+            break
+        except HTTPError as exc:
+            # D&D Beyond can occasionally answer a valid public character with
+            # a transient 403. Retry transient statuses only; real 401/404
+            # still fail immediately.
+            retryable = exc.code in {403, 429, 500, 502, 503, 504}
+            if retryable and retry_index < len(delays):
+                delay = max(0.0, float(delays[retry_index]))
+                retry_index += 1
+                if delay:
+                    time.sleep(delay)
+                continue
+
+            if exc.code in {401, 403, 404}:
+                raise RuntimeError(
+                    "D&D Beyond 캐릭터 데이터를 가져올 수 없습니다. "
+                    "캐릭터가 링크로 조회 가능한 상태인지 확인하고 다시 시도하세요. "
+                    f"(HTTP {exc.code})"
+                ) from exc
             raise RuntimeError(
-                "D&D Beyond 캐릭터 데이터를 가져올 수 없습니다. "
-                "캐릭터가 링크로 조회 가능한 상태인지 확인하고 다시 시도하세요. "
-                f"(HTTP {exc.code})"
+                f"D&D Beyond 캐릭터 서비스가 HTTP {exc.code} 오류를 반환했습니다."
             ) from exc
-        raise RuntimeError(
-            f"D&D Beyond 캐릭터 서비스가 HTTP {exc.code} 오류를 반환했습니다."
-        ) from exc
-    except URLError as exc:
-        raise RuntimeError(
-            "D&D Beyond에 연결하지 못했습니다. 인터넷 연결을 확인하세요."
-        ) from exc
-    except TimeoutError as exc:
-        raise RuntimeError(
-            "D&D Beyond 응답 시간이 초과되었습니다."
-        ) from exc
+        except URLError as exc:
+            raise RuntimeError(
+                "D&D Beyond에 연결하지 못했습니다. 인터넷 연결을 확인하세요."
+            ) from exc
+        except TimeoutError as exc:
+            raise RuntimeError(
+                "D&D Beyond 응답 시간이 초과되었습니다."
+            ) from exc
 
     if status != 200:
         raise RuntimeError(
@@ -821,9 +844,23 @@ def normalize_character(data):
             in selected_feat_ids
         ]
     else:
-        # Conservative compatibility fallback for older/alternate payloads that
-        # do not expose choice/grant links.
-        active_feats = raw_feats
+        # D&D Beyond disguise/helper feats are not owned feats.
+        #
+        # Older/alternate payloads do not always expose explicit choice/grant
+        # links. Preserve ordinary top-level feats because actions/modifiers
+        # can depend on them (for example Great Weapon Master). D&D Beyond
+        # marks placeholder/helper entries such as Dark Bargain with the
+        # __DISGUISE_FEAT category, so exclude only those.
+        active_feats = []
+        for entry in raw_feats:
+            definition = _dict(_dict(entry).get("definition") or entry)
+            category_tags = {
+                str(_dict(category).get("tagName") or "").strip()
+                for category in _list(definition.get("categories"))
+            }
+            if "__DISGUISE_FEAT" in category_tags:
+                continue
+            active_feats.append(entry)
 
     feature_groups = [
         (visible_racial_traits, "racial_trait"),

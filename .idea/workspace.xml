@@ -5,33 +5,27 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/README_STAGE13_UI.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/SheetMover.spec" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/build_windows.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements-build.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/app_config.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_app_config.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_full_run.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_ui_beginner_setup.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_ui_roll20_autolaunch.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_ui_roll20_manual_launch.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE13_V2_1.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE5_MULTICLASS_V1.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V17.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V171.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V172.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE8_INTEGRITY_V173.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage13_v2_1.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage5_multiclass_v1.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v17.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v171.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v172.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage8_integrity_v173.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage5_multiclass.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage8_integrity_v17.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/google_glossary.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/google_glossary.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/result_store.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/result_store.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_attacks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_features.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_inventory.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_inventory.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_proficiencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_proficiencies.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spells.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spells.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/translator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/translator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/ui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/source.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/source.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/stage5_basic_writer_v2.py" beforeDir="false" afterPath="$PROJECT_DIR$/stage5_basic_writer_v2.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage5_basic_writer_v3.py" beforeDir="false" afterPath="$PROJECT_DIR$/stage5_basic_writer_v3.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_full_run.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_preparation.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_preparation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,36 +56,36 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.__main__.executor": "Run",
-    "Python.apply_stage2.executor": "Run",
-    "Python.main.executor": "Run",
-    "Python.roll20_resources.executor": "Run",
-    "Python.stage5_basic_writer.executor": "Run",
-    "Python.stage5_basic_writer_v2.executor": "Run",
-    "Python.stage5_basic_writer_v3.executor": "Run",
-    "Python.stage5_dom_probe.executor": "Run",
-    "Python.stage5_probe.executor": "Run",
-    "Python.stage5_probe_v2.executor": "Run",
-    "Python.stage5_recovery_probe.executor": "Run",
-    "Python.stage8_feature_writer.executor": "Run",
-    "Python.stage9_action_writer.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "E:/sheet_mover/sheet_mover",
-    "nodejs_package_manager_path": "npm"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.__main__.executor&quot;: &quot;Run&quot;,
+    &quot;Python.apply_stage2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.roll20_resources.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_basic_writer.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_basic_writer_v2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_basic_writer_v3.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_dom_probe.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_probe.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_probe_v2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_recovery_probe.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage8_feature_writer.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage9_action_writer.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/sheet_mover&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="E:\sheet_mover\sheet_mover" />
-      <recent name="E:\sheet_mover\tests" />
       <recent name="E:\sheet_mover" />
+      <recent name="E:\sheet_mover\tests" />
+      <recent name="E:\sheet_mover\sheet_mover" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="E:\sheet_mover\sheet_mover" />
@@ -266,7 +260,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791276714191</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791286348660</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1791286348660</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

@@ -2,6 +2,7 @@
 import json
 import re
 import unittest
+from urllib.error import HTTPError
 
 from sheet_mover.models import CharacterSheet
 from sheet_mover.mover import is_roll20_game
@@ -364,6 +365,43 @@ class PreparationTests(unittest.TestCase):
             "includeCustomItems=true",
             captured["url"],
         )
+
+    def test_fetch_character_retries_transient_403(self):
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {"data": {"id": 170892133, "name": "견본"}}
+                ).encode("utf-8")
+
+        calls = {"count": 0}
+
+        def opener(request, timeout):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise HTTPError(
+                    request.full_url,
+                    403,
+                    "Forbidden",
+                    hdrs=None,
+                    fp=None,
+                )
+            return FakeResponse()
+
+        data = fetch_character(
+            "https://www.dndbeyond.com/characters/170892133",
+            opener=opener,
+            retry_delays=(0,),
+        )
+        self.assertEqual(data["name"], "견본")
+        self.assertEqual(calls["count"], 2)
 
     def test_fetch_character_rejects_wrong_response_id(self):
         class FakeResponse:

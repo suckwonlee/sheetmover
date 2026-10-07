@@ -31,7 +31,7 @@ from sheet_mover.roll20_connection import (
     _select_roll20_tab,
 )
 
-VERSION = "2026-10-06-stage5-basic-fields-v2"
+VERSION = "2026-10-06-stage5-basic-fields-v2.1-multiclass"
 ROOT = Path.cwd()
 
 ABILITY_NAMES = (
@@ -55,8 +55,21 @@ SPELL_ABILITY_VALUE = {
 # Stage 5 owns only these single-value attributes.
 STAGE5_NAMES = {
     "class",
+    "class_display",
     "subclass",
     "base_level",
+    "multiclass1_flag",
+    "multiclass1",
+    "multiclass1_lvl",
+    "multiclass1_subclass",
+    "multiclass2_flag",
+    "multiclass2",
+    "multiclass2_lvl",
+    "multiclass2_subclass",
+    "multiclass3_flag",
+    "multiclass3",
+    "multiclass3_lvl",
+    "multiclass3_subclass",
     "level",
     "pb_type",
     "pb",
@@ -139,14 +152,28 @@ def _character(payload):
     return character
 
 
-def _single_class(character):
-    rows = [x for x in _list(character.get("classes")) if isinstance(x, dict)]
-    if len(rows) != 1:
+def _ordered_classes(character):
+    rows = [
+        row for row in _list(character.get("classes"))
+        if isinstance(row, dict)
+    ]
+    if not rows:
+        raise RuntimeError("클래스 정보가 없습니다.")
+    if len(rows) > 4:
         raise RuntimeError(
-            "5단계 v2는 현재 단일 클래스만 지원합니다. "
-            f"클래스 수: {len(rows)}"
+            "Roll20 Legacy는 최대 4개 클래스(기본 1 + 멀티 3)까지만 "
+            f"지원합니다. 클래스 수: {len(rows)}"
         )
-    return rows[0]
+
+    starting = [row for row in rows if row.get("is_starting_class") is True]
+    if len(starting) > 1:
+        raise RuntimeError("D&D Beyond 시작 클래스가 둘 이상입니다.")
+
+    if starting:
+        base = starting[0]
+        return [base, *[row for row in rows if row is not base]]
+
+    return rows
 
 
 def _original_name(obj, original_key="original_name", fallback_key="name"):
@@ -185,18 +212,19 @@ def _spell_ability(character, cls):
     return value if value in ABILITY_NAMES else None
 
 
-def _caster_level_for_single_class(cls):
+def _caster_type(cls):
     name = _original_name(cls).casefold()
     level = cls.get("level")
     if type(level) is not int or level < 1:
-        return 0
+        return 0.0
 
     if name in {"bard", "cleric", "druid", "sorcerer", "wizard"}:
-        return level
-    if name == "artificer":
-        return math.ceil(level / 2)
-    if name in {"paladin", "ranger"}:
-        return math.floor(level / 2)
+        return 1.0
+
+    if name in {"artificer", "paladin", "ranger"}:
+        if name == "artificer" and level == 1:
+            return 1.0
+        return 0.0 if level == 1 else 0.5
 
     subclass = _text(
         cls.get("original_subclass_name") or cls.get("subclass_name")
@@ -205,14 +233,47 @@ def _caster_level_for_single_class(cls):
         (name == "fighter" and subclass == "eldritch knight")
         or (name == "rogue" and subclass == "arcane trickster")
     ):
-        return math.ceil(level / 3)
+        return 0.0 if level in {1, 2} else (1.0 / 3.0)
 
-    return 0
+    return 0.0
+
+
+def _caster_level_for_classes(classes):
+    multicaster = sum(1 for cls in classes if _caster_type(cls) > 0) > 1
+    total = 0
+    for cls in classes:
+        level = cls.get("level")
+        if type(level) is not int or level < 1:
+            continue
+        value = level * _caster_type(cls)
+        total += math.floor(value) if multicaster else math.ceil(value)
+    return total
+
+
+def _is_arcane_fighter(classes):
+    return any(
+        _original_name(cls).casefold() == "fighter"
+        and _text(
+            cls.get("original_subclass_name") or cls.get("subclass_name")
+        ).casefold() == "eldritch knight"
+        for cls in classes
+    )
+
+
+def _is_arcane_rogue(classes):
+    return any(
+        _original_name(cls).casefold() == "rogue"
+        and _text(
+            cls.get("original_subclass_name") or cls.get("subclass_name")
+        ).casefold() == "arcane trickster"
+        for cls in classes
+    )
 
 
 def build_plan(payload: dict[str, Any]):
     character = _character(payload)
-    cls = _single_class(character)
+    classes = _ordered_classes(character)
+    cls = classes[0]
 
     values: dict[str, dict[str, str | None]] = {}
 
@@ -246,15 +307,52 @@ def build_plan(payload: dict[str, Any]):
     put("pb_type", "level")
     put("pb", pb)
 
-    subclass = _text(cls.get("subclass_name") or cls.get("original_subclass_name"))
-    if subclass:
-        put("subclass", subclass)
+    subclass = _text(
+        cls.get("subclass_name") or cls.get("original_subclass_name")
+    )
+    put("subclass", subclass)
 
-    subclass_original = _text(
-        cls.get("original_subclass_name") or cls.get("subclass_name")
-    ).casefold()
-    put("arcane_fighter", 1 if subclass_original == "eldritch knight" else 0)
-    put("arcane_rogue", 1 if subclass_original == "arcane trickster" else 0)
+    display_parts = [
+        f"{subclass} {class_name} {level}"
+        if subclass else f"{class_name} {level}"
+    ]
+
+    secondary = classes[1:]
+    for slot in range(1, 4):
+        row = secondary[slot - 1] if slot <= len(secondary) else None
+        prefix = f"multiclass{slot}"
+
+        if row is None:
+            put(f"{prefix}_flag", 0)
+            put(prefix, "")
+            put(f"{prefix}_lvl", "")
+            put(f"{prefix}_subclass", "")
+            continue
+
+        multi_name = _original_name(row)
+        multi_level = row.get("level")
+        if not multi_name:
+            raise RuntimeError(f"{slot + 1}번째 클래스 원문 이름이 없습니다.")
+        if type(multi_level) is not int or multi_level < 1:
+            raise RuntimeError(f"{multi_name} 클래스 레벨이 확정되지 않았습니다.")
+
+        multi_subclass = _text(
+            row.get("subclass_name") or row.get("original_subclass_name")
+        )
+
+        put(f"{prefix}_flag", 1)
+        put(prefix, multi_name)
+        put(f"{prefix}_lvl", multi_level)
+        put(f"{prefix}_subclass", multi_subclass)
+
+        display_parts.append(
+            f"{multi_subclass} {multi_name} {multi_level}"
+            if multi_subclass else f"{multi_name} {multi_level}"
+        )
+
+    put("class_display", ", ".join(display_parts))
+    put("arcane_fighter", 1 if _is_arcane_fighter(classes) else 0)
+    put("arcane_rogue", 1 if _is_arcane_rogue(classes) else 0)
 
     race = _dict(character.get("race"))
     race_name = _display_name(race)
@@ -332,7 +430,7 @@ def build_plan(payload: dict[str, Any]):
                 put("spell_attack_mod", attack_delta)
                 put("spell_attack_bonus", final_attack)
 
-    put("caster_level", _caster_level_for_single_class(cls))
+    put("caster_level", _caster_level_for_classes(classes))
 
     return {
         "version": VERSION,

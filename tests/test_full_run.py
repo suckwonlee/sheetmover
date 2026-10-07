@@ -92,16 +92,39 @@ class FullRunFailureTests(unittest.TestCase):
                          Path(report["paths"]["sheet_result"]))
         self.assertEqual(self.events[-1]["type"], "complete")
 
-    def test_partial_return_is_saved_before_any_roll20_input(self):
-        self.payload["translation_summary"] = {"status": "partial", "original_preserved_count": 1}
-        with self.assertRaises(RuntimeError):
-            self.run_move()
-        self.target.assert_not_called()
-        self.assertEqual(self.report()["stage_statuses"]["1"], "error")
-        partial = Path(self.report()["paths"]["partial_result"])
-        self.assertEqual(json.loads(partial.read_text(encoding="utf-8"))["translated"], self.payload["translated"])
+    def test_partial_return_continues_with_exact_original_fallback(self):
+        self.payload["translation_summary"] = {
+            "status": "partial",
+            "original_preserved_count": 1,
+            "original_preserved": [
+                {
+                    "reason": "unsafe translation; exact source preserved",
+                    "source_preview": "The original rule text",
+                }
+            ],
+        }
+        result = self.run_move()
+        report = self.report()
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(report["stage_statuses"]["1"], "pass")
+        self.assertEqual(
+            report["translation_summary"]["original_preserved_count"],
+            1,
+        )
+        self.target.assert_called_once()
+        self.assertTrue(all(writer.called for writer in self.writers))
+        self.assertTrue(any(e["type"] == "complete" for e in self.events))
+
+        sheet_result = Path(report["paths"]["sheet_result"])
+        saved = json.loads(sheet_result.read_text(encoding="utf-8"))
+        self.assertEqual(saved["translated"], self.payload["translated"])
+        self.assertEqual(saved["translation_summary"]["status"], "partial")
+
+        # A partial translation is still not advertised as a fully translated
+        # standalone result. The one-click run can use it because it passes the
+        # exact result_path directly to every Roll20 writer.
         self.assertIsNone(latest_complete_result(root=self.root))
-        self.assertFalse(any(e["type"] == "complete" for e in self.events))
 
     def test_translation_exception_preserves_partial_payload_and_error_details(self):
         exc = TranslationError("translation interrupted")
