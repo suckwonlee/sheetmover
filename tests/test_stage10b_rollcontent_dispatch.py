@@ -3,12 +3,12 @@ from unittest.mock import patch
 
 from sheet_mover.roll20_spell_attacks import (
     _poll_persisted,
-    _split_rollcontent_attrs,
+    _split_link_attrs,
 )
 
 
 class Stage10BRollcontentDispatchTests(unittest.TestCase):
-    def test_rollcontent_is_split_from_normal_spell_fields(self):
+    def test_link_fields_are_split_from_normal_spell_fields(self):
         attrs = {
             "repeating_spell-2_-SMabc_spelloutput": {
                 "current": "ATTACK",
@@ -23,10 +23,14 @@ class Stage10BRollcontentDispatchTests(unittest.TestCase):
                 "max": "",
             },
         }
-        normal, roll = _split_rollcontent_attrs(attrs)
-        self.assertEqual(len(normal), 2)
-        self.assertEqual(len(roll), 1)
-        self.assertIn("repeating_spell-2_-SMabc_rollcontent", roll)
+
+        normal, links = _split_link_attrs(attrs)
+
+        self.assertEqual(len(normal), 1)
+        self.assertEqual(len(links), 2)
+        self.assertIn("repeating_spell-2_-SMabc_spelloutput", normal)
+        self.assertIn("repeating_spell-2_-SMabc_spellattackid", links)
+        self.assertIn("repeating_spell-2_-SMabc_rollcontent", links)
 
     def test_poll_waits_until_server_value_matches(self):
         name = "repeating_spell-2_-SMabc_rollcontent"
@@ -43,7 +47,9 @@ class Stage10BRollcontentDispatchTests(unittest.TestCase):
         with patch(
             "sheet_mover.roll20_spell_attacks._snapshot",
             side_effect=[missing, missing, present],
-        ), patch("sheet_mover.roll20_spell_attacks.time.sleep"):
+        ), patch(
+            "sheet_mover.roll20_spell_attacks.time.sleep"
+        ):
             actual, attempts = _poll_persisted(
                 object(),
                 {},

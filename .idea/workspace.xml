@@ -5,13 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/README_STAGE10B_V11.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_STAGE10B_V12.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage10b_v11_sequential.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_stage10b_v12_rollcontent_dispatch.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/patch_files/test_stage10b_sequential_hotfix.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test_stage10b_rollcontent_dispatch.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_STAGE10B_V13.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_stage10b_v13_link_dispatch.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/test_stage10b_link_dispatch.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_spell_attacks.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -263,7 +259,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791350221985</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791351568538</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1791351568538</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

@@ -43,7 +43,7 @@ from .roll20_spells import (
 )
 
 
-STAGE10B_VERSION = "2026-10-07-stage10b-roll20-spell-attacks-v1.2-rollcontent-dispatch"
+STAGE10B_VERSION = "2026-10-07-stage10b-roll20-spell-attacks-v1.3-link-dispatch"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -284,15 +284,15 @@ try {
 """
 
 
-def _split_rollcontent_attrs(attrs):
+def _split_link_attrs(attrs):
     normal = {}
-    rollcontent = {}
+    links = {}
     for name, spec in attrs.items():
-        if name.endswith("_rollcontent"):
-            rollcontent[name] = spec
+        if name.endswith("_spellattackid") or name.endswith("_rollcontent"):
+            links[name] = spec
         else:
             normal[name] = spec
-    return normal, rollcontent
+    return normal, links
 
 
 def _poll_persisted(driver, target, attrs, label, attempts=8, delay=0.75):
@@ -312,40 +312,57 @@ def _poll_persisted(driver, target, attrs, label, attempts=8, delay=0.75):
     )
 
 
-def _write_rollcontent_and_verify(driver, target, attrs, label):
+def _write_link_attrs_and_verify(driver, target, attrs, label):
     if not attrs:
-        return {"ok": True, "action": "none"}, {}
+        return {"ok": True, "action": "none", "results": []}, {}
 
-    if len(attrs) != 1:
-        raise RuntimeError(
-            f"{label}: rollcontent 속성은 한 번에 1개여야 합니다. "
-            f"현재 {len(attrs)}개"
-        )
-
-    name, spec = next(iter(attrs.items()))
-    driver.set_script_timeout(30)
-    outcome = driver.execute_async_script(
-        ROLLCONTENT_DISPATCH_SCRIPT,
-        _text(target.get("roll20_character_id")),
-        _text(target.get("character_name")),
-        name,
-        spec,
-    )
-    if not isinstance(outcome, dict) or not outcome.get("ok"):
-        raise RuntimeError(
-            f"{label} dispatch 실패: "
-            + json.dumps(outcome, ensure_ascii=False)
-        )
-
-    actual, attempts = _poll_persisted(
-        driver,
-        target,
+    ordered_names = sorted(
         attrs,
-        label,
+        key=lambda name: (
+            0 if name.endswith("_spellattackid") else 1,
+            name,
+        ),
     )
-    outcome = dict(outcome)
-    outcome["persisted_verify_attempts"] = attempts
-    return outcome, actual
+
+    results = []
+    merged_actual = {}
+    driver.set_script_timeout(30)
+
+    for name in ordered_names:
+        spec = attrs[name]
+        outcome = driver.execute_async_script(
+            ROLLCONTENT_DISPATCH_SCRIPT,
+            _text(target.get("roll20_character_id")),
+            _text(target.get("character_name")),
+            name,
+            spec,
+        )
+        if not isinstance(outcome, dict) or not outcome.get("ok"):
+            raise RuntimeError(
+                f"{label} dispatch 실패: "
+                + json.dumps(
+                    {"attribute": name, "outcome": outcome},
+                    ensure_ascii=False,
+                )
+            )
+
+        actual, attempts = _poll_persisted(
+            driver,
+            target,
+            {name: spec},
+            f"{label} [{name}]",
+        )
+        row_result = dict(outcome)
+        row_result["attribute"] = name
+        row_result["persisted_verify_attempts"] = attempts
+        results.append(row_result)
+        merged_actual.update(actual)
+
+    return {
+        "ok": True,
+        "action": "link_dispatch",
+        "results": results,
+    }, merged_actual
 
 
 def spell_attack_row_id(source_key: str) -> str:
@@ -600,6 +617,8 @@ def build_spell_attack_plan(result_payload):
             "as_part_of_weapon_attack_stays_spellcard": True,
             "rollcontent_no_wait_dispatch": True,
             "rollcontent_persisted_poll_verify": True,
+            "spellattackid_no_wait_dispatch": True,
+            "spellattackid_persisted_poll_verify": True,
             "sequential_spell_link_writes": True,
             "persisted_state_wins_over_save_callback_timeout": True,
         },
@@ -808,7 +827,7 @@ def apply_spell_attacks(
                 character_id,
                 attack_id,
             )
-            normal_attrs, rollcontent_attrs = _split_rollcontent_attrs(
+            normal_attrs, link_attrs = _split_link_attrs(
                 spell_attrs
             )
 
@@ -829,11 +848,11 @@ def apply_spell_attacks(
                         f"주문 출력 '{spell_row['name']}'",
                     )
 
-            _write_rollcontent_and_verify(
+            _write_link_attrs_and_verify(
                 driver,
                 target,
-                rollcontent_attrs,
-                f"주문 출력 '{spell_row['name']}' rollcontent",
+                link_attrs,
+                f"주문 출력 '{spell_row['name']}' 링크",
             )
             report["mutated"] = True
 
