@@ -7,6 +7,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 import sys
+import time
 import traceback
 from uuid import uuid4
 
@@ -15,7 +16,7 @@ from .app_config import (
     data_dir, load_settings, validate_settings,
 )
 
-FULL_RUN_VERSION = "2026-10-07-stage13-full-run-v2.3-roll20-preflight-cache"
+FULL_RUN_VERSION = "2026-10-07-stage13-full-run-v2.4-final-ui-refresh"
 STAGES = (
     "D&D Beyond 수집 · 번역 · 계산", "Roll20 대상 확인", "기본 능력치",
     "인벤토리", "주문", "특성", "무기 공격", "주문 공격", "숙련", "자원",
@@ -96,6 +97,95 @@ def _find_reusable_result(source_id: str, raw_source: dict):
         return payload, path
 
     return None, None
+
+
+
+def _refresh_roll20_views(cdp_url: str, timeout: float = 30.0):
+    from urllib.parse import urlparse
+    from .roll20_connection import (
+        _attach_driver,
+        _disconnect_driver,
+        _ensure_cdp,
+    )
+
+    _ensure_cdp(cdp_url)
+    driver = _attach_driver(cdp_url)
+    refreshed = []
+    editor_ready = False
+    original_handle = getattr(driver, "current_window_handle", None)
+
+    try:
+        handles = list(driver.window_handles)
+        for handle in handles:
+            try:
+                driver.switch_to.window(handle)
+                url = str(driver.current_url or "")
+                parsed = urlparse(url)
+                if parsed.hostname != "app.roll20.net":
+                    continue
+                driver.refresh()
+                refreshed.append(url)
+            except Exception:
+                continue
+
+        if not refreshed:
+            raise RuntimeError(
+                "최종 동기화할 Roll20 탭을 찾지 못했습니다."
+            )
+
+        deadline = time.monotonic() + max(5.0, float(timeout))
+        while time.monotonic() < deadline:
+            for handle in list(driver.window_handles):
+                try:
+                    driver.switch_to.window(handle)
+                    url = str(driver.current_url or "")
+                    parsed = urlparse(url)
+                    if (
+                        parsed.hostname != "app.roll20.net"
+                        or not parsed.path.startswith("/editor")
+                    ):
+                        continue
+                    ready = str(
+                        driver.execute_script(
+                            "return document.readyState || '';"
+                        )
+                        or ""
+                    )
+                    campaign = bool(
+                        driver.execute_script(
+                            "return !!((window.d20 && window.d20.Campaign) "
+                            "|| window.Campaign);"
+                        )
+                    )
+                    if ready == "complete" and campaign:
+                        editor_ready = True
+                        break
+                except Exception:
+                    continue
+
+            if editor_ready:
+                break
+            time.sleep(0.25)
+
+        if not editor_ready:
+            raise RuntimeError(
+                "Roll20 저장은 끝났지만 최종 화면 재로딩 후 "
+                "게임 준비 상태를 확인하지 못했습니다."
+            )
+
+        return {
+            "status": "pass",
+            "refreshed_view_count": len(refreshed),
+            "editor_ready": True,
+        }
+    finally:
+        if original_handle:
+            try:
+                if original_handle in list(driver.window_handles):
+                    driver.switch_to.window(original_handle)
+            except Exception:
+                pass
+        _disconnect_driver(driver)
 
 
 def _emit_stdout(event: dict):
@@ -306,6 +396,10 @@ def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=N
         ):
             run_stage(index, key, func, result_path=result_path, source_id=source_id,
                       cdp_url=settings.roll20_cdp_url, dry_run=False)
+        overall(99, "Roll20 화면을 저장된 서버 상태로 다시 불러옵니다.")
+        state["roll20_ui_refresh"] = _refresh_roll20_views(
+            settings.roll20_cdp_url
+        )
         state["status"] = "pass"
         state["active_stage"] = None
         state["finished_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -369,7 +463,6 @@ def cli_main(argv=None):
             emit({"type": "error", "message": str(exc),
                   "traceback": traceback.format_exc(),
                   "report": getattr(exc, "failure_report_path", None),
-                  "paths": getattr(exc, "failure_report", {}).get("paths", {}),
                   "save_errors": getattr(exc, "save_errors", [])})
             return 1
 

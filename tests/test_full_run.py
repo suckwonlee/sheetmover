@@ -54,6 +54,17 @@ class FullRunFailureTests(unittest.TestCase):
         self.stack.enter_context(patch.object(full_run, "check_ollama", return_value={"ok": True}))
         self.settings = AppSettings(google_project_id="fixture")
         self.events = []
+        self.refresh_roll20 = self.stack.enter_context(
+            patch.object(
+                full_run,
+                "_refresh_roll20_views",
+                return_value={
+                    "status": "pass",
+                    "refreshed_view_count": 1,
+                    "editor_ready": True,
+                },
+            )
+        )
         self.fetch_character = self.stack.enter_context(
             patch("sheet_mover.source.fetch_character")
         )
@@ -98,6 +109,17 @@ class FullRunFailureTests(unittest.TestCase):
         self.assertEqual(self.writers[0].call_args.kwargs["result_path"].resolve(),
                          Path(report["paths"]["sheet_result"]))
         self.assertEqual(self.events[-1]["type"], "complete")
+
+    def test_success_refreshes_roll20_before_complete(self):
+        self.run_move()
+        self.refresh_roll20.assert_called_once_with(
+            self.settings.roll20_cdp_url
+        )
+        report = self.report()
+        self.assertEqual(
+            report["roll20_ui_refresh"]["status"],
+            "pass",
+        )
 
     def test_roll20_preflight_happens_before_translation(self):
         order = []

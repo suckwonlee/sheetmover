@@ -181,8 +181,7 @@ class SheetMoverUI(tk.Tk):
         ttk.Label(
             root,
             text=(
-                "D&D Beyond 캐릭터를 번역·계산한 뒤 Roll20 Legacy OGL5e로 "
-                "한 번에 입력합니다."
+                "해당 프로그램은 완벽하지 않습니다. 번역 오류가 발생한 피처나 주문이 있을 수 있습니다."
             ),
             style="Sub.TLabel",
         ).pack(anchor="w", pady=(0, 14))
@@ -518,12 +517,20 @@ class SheetMoverUI(tk.Tk):
             except Exception as exc:
                 self._post(self._worker_failure, str(exc))
             finally:
-                # events/settings are IPC files, not retained user logs.
-                for transient in (event_path, snapshot_path):
-                    try:
-                        Path(transient).unlink(missing_ok=True)
-                    except OSError:
-                        pass
+                # Keep only run.log for one GUI execution.
+                try:
+                    for transient in list(run_folder.iterdir()):
+                        try:
+                            if transient.resolve() == log_path.resolve():
+                                continue
+                            if transient.is_dir():
+                                shutil.rmtree(transient, ignore_errors=True)
+                            else:
+                                transient.unlink(missing_ok=True)
+                        except OSError:
+                            pass
+                except OSError:
+                    pass
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -547,17 +554,13 @@ class SheetMoverUI(tk.Tk):
                 self.log(f"[{event.get('name')}] {event.get('message')}")
         elif kind == "complete":
             self.progress_text.set("완료 보고서 확인 중")
-            self.log(f"완료 보고서: {event.get('report')}")
+            self.log("완료 보고서 검증 통과")
         elif kind == "error":
             self.progress_text.set("실패")
             self.log("오류: " + str(event.get("message") or ""))
             trace = event.get("traceback")
             if trace:
                 self.log(trace)
-            if event.get("report"):
-                self.log(f"실패 기록: {event['report']}")
-            for key, path in (event.get("paths") or {}).items():
-                self.log(f"저장된 결과 [{key}]: {path}")
             for error in event.get("save_errors") or []:
                 self.log(error)
 
