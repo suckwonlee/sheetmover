@@ -1051,3 +1051,7 @@ def normalize_character(data):
     # conditional rules fail closed instead of being guessed.
     apply_stage2_calculations(sheet)
     return sheet
+
+# runtime-integrity-v2.6.2 source hook
+from .runtime_integrity_v262 import install_source_integrity as _install_source_integrity_v262
+normalize_character = _install_source_integrity_v262(normalize_character)

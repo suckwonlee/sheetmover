@@ -600,5 +600,9 @@ def cli_main(argv=None):
     return execute(_emit_stdout)
 
 
+# runtime-integrity-v2.6.2 cache-refresh hook
+from .runtime_integrity_v262 import install_reusable_result_refresh as _install_reusable_result_refresh_v262
+_find_reusable_result = _install_reusable_result_refresh_v262(_find_reusable_result)
+
 if __name__ == "__main__":
     raise SystemExit(cli_main())

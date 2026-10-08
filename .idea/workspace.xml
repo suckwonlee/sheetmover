@@ -5,20 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="47153943-daba-4f98-917c-6e31a340e2de" name="변경" comment="시트 이동기 최초 실행">
-      <change afterPath="$PROJECT_DIR$/README_COMBAT_FEATURES_V26.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_RUNTIME_INTEGRITY_V252.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_combat_features_v26.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/apply_runtime_integrity_v252.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payload/sheet_mover/runtime_integrity_v26.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payload/tests/test_runtime_integrity_v26.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_ABILITY_CHOICE_V262.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README_ABILITY_CHOICE_V2621_HOTFIX.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_ability_choice_v262.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/apply_ability_choice_v2621_hotfix.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/payload/sheet_mover/runtime_integrity_v262.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/payload/tests/test_runtime_integrity_v262.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/payload/tests/test_runtime_integrity_v2621_hotfix.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/calculator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/calculator.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sheet_mover/full_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/full_run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_attacks.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_attacks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_features.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/roll20_resources.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sheet_mover/ui.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/ui.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage5_basic_writer_v2.py" beforeDir="false" afterPath="$PROJECT_DIR$/stage5_basic_writer_v2.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sheet_mover/source.py" beforeDir="false" afterPath="$PROJECT_DIR$/sheet_mover/source.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -309,7 +305,15 @@
       <option name="project" value="LOCAL" />
       <updated>1791361709721</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="시트 이동기 최초 실행">
+      <option name="closed" value="true" />
+      <created>1791368034927</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1791368034927</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
