@@ -308,19 +308,29 @@ def _emit_stdout(event: dict):
     print(json.dumps(event, ensure_ascii=False), flush=True)
 
 
-def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=None):
+def run_full_move(
+    source_url: str,
+    settings: AppSettings,
+    *,
+    emit=None,
+    run_id=None,
+    update_existing=False,
+):
     emit = emit or (lambda _event: None)
     run_id = run_id or uuid4().hex
+    update_existing = bool(update_existing)
     report_path = data_dir() / "results" / "current" / f"full-run-{run_id}.json"
     state = {
         "version": FULL_RUN_VERSION, "run_id": run_id, "status": "running",
         "source_url": source_url, "source_character_id": "", "character_name": "",
         "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "run_mode": "update_existing" if update_existing else "initial_move",
         "paths": {}, "stages": list(STAGES), "reports": {},
         "stage_statuses": {str(i): "pending" for i in range(1, len(STAGES) + 1)},
         "active_stage": None, "full_run_report": str(report_path.resolve()),
     }
     payload = None
+    previous_result_path = None
 
     def checkpoint():
         _write_json(report_path, state)
@@ -417,7 +427,39 @@ def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=N
         )
         state["paths"]["target"] = str(Path(target_path).resolve())
         stage(2, "pass", "Roll20 게임 탭 · 대상 캐릭터 · Legacy OGL5e 시트 확인 완료")
-        overall(5, "Roll20 준비 완료. 기존 번역 결과를 확인합니다.")
+
+        if update_existing:
+            from .update_mode import prepare_update_context
+
+            update_context = prepare_update_context(
+                identity_raw,
+                data_root=data_dir(),
+            )
+            state["update_mode"] = update_context
+            previous_result_path = update_context["previous_result_path"]
+            classification = str(update_context.get("classification") or "")
+            level_delta = int(update_context.get("level_delta") or 0)
+            if classification == "probable_level_up":
+                overall(
+                    5,
+                    "기존 결과 비교 완료 · "
+                    f"레벨 {update_context.get('previous_total_level')} → "
+                    f"{update_context.get('current_total_level')} "
+                    f"(+{level_delta}) · 변경사항 업데이트 준비",
+                )
+            else:
+                overall(
+                    5,
+                    "기존 결과 비교 완료 · "
+                    f"변경 구역 {len(update_context.get('changed_sections') or [])}개 · "
+                    "변경사항 업데이트 준비",
+                )
+        else:
+            state["update_mode"] = {
+                "enabled": False,
+                "classification": "initial_move",
+            }
+            overall(5, "Roll20 준비 완료. 기존 번역 결과를 확인합니다.")
 
         payload, reusable_path = _find_reusable_result(source_id, identity_raw)
         if payload is not None and reusable_path is not None:
@@ -458,12 +500,21 @@ def run_full_move(source_url: str, settings: AppSettings, *, emit=None, run_id=N
                         f"{result.get('detail') or ''}".strip()
                     )
 
-            prepared = prepare(
-                source_url,
-                cdp_url=settings.roll20_cdp_url,
-                on_progress=lambda p, m: overall(5 + float(p) * .25, m),
-                raw_source=identity_raw,
-            )
+            if update_existing:
+                prepared = prepare(
+                    source_url,
+                    cdp_url=settings.roll20_cdp_url,
+                    on_progress=lambda p, m: overall(5 + float(p) * .25, m),
+                    raw_source=identity_raw,
+                    translation_seed_path=previous_result_path,
+                )
+            else:
+                prepared = prepare(
+                    source_url,
+                    cdp_url=settings.roll20_cdp_url,
+                    on_progress=lambda p, m: overall(5 + float(p) * .25, m),
+                    raw_source=identity_raw,
+                )
             payload = prepared.to_dict()
             original = payload.get("original") or {}
             prepared_source_id = str(original.get("source_id") or "").strip()
@@ -564,14 +615,28 @@ def cli_main(argv=None):
     parser.add_argument("--events")
     parser.add_argument("--log")
     parser.add_argument("--run-id")
+    parser.add_argument("--update-existing", action="store_true", help="이전 시트 이동 결과와 비교해 기존 캐릭터 변경사항을 업데이트합니다.")
     args = parser.parse_args(argv)
     if args.events and (not args.log or not args.run_id):
         parser.error("--events requires --log and --run-id")
 
     def execute(emit):
         try:
-            run_full_move(args.source, load_settings(args.settings),
-                          emit=emit, run_id=args.run_id)
+            if args.update_existing:
+                run_full_move(
+                    args.source,
+                    load_settings(args.settings),
+                    emit=emit,
+                    run_id=args.run_id,
+                    update_existing=True,
+                )
+            else:
+                run_full_move(
+                    args.source,
+                    load_settings(args.settings),
+                    emit=emit,
+                    run_id=args.run_id,
+                )
             return 0
         except Exception as exc:
             emit({"type": "error", "message": str(exc),
@@ -612,6 +677,10 @@ def cli_main(argv=None):
 # runtime-integrity-v2.6.2 cache-refresh hook
 from .runtime_integrity_v262 import install_reusable_result_refresh as _install_reusable_result_refresh_v262
 _find_reusable_result = _install_reusable_result_refresh_v262(_find_reusable_result)
+
+# runtime-integrity-v2.6.4 subclass-spell cache-refresh hook
+from .runtime_integrity_v264 import install_reusable_result_refresh as _install_reusable_result_refresh_v264
+_find_reusable_result = _install_reusable_result_refresh_v264(_find_reusable_result)
 
 # single-current-log-v1
 from .run_log import install_single_current_log as _install_single_current_log_v1

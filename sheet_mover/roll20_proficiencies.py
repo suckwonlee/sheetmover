@@ -47,7 +47,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE11_VERSION = "2026-10-07-stage11-roll20-proficiencies-v2.3-resilient-batches"
+STAGE11_VERSION = "2026-10-08-stage11-roll20-proficiencies-v2.4-source-integrity"
 PB_CHECKED = "(@{pb})"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
@@ -204,15 +204,25 @@ def _translated_languages(result_payload):
     translated = _translated_character(result_payload)
     original = _original_character(result_payload)
 
-    translated_values = [
-        _text(v) for v in _list(translated.get("languages")) if _text(v)
-    ]
-    if translated_values:
-        return translated_values
+    original_raw = _list(original.get("languages"))
+    translated_raw = _list(translated.get("languages"))
+    original_values = [_text(v) for v in original_raw if _text(v)]
 
-    return [
-        _text(v) for v in _list(original.get("languages")) if _text(v)
-    ]
+    # A partially translated list must never make a source language disappear.
+    # Use translated values only when the list shape still matches DDB.
+    if original_raw and len(translated_raw) == len(original_raw):
+        resolved = []
+        for original_value, translated_value in zip(original_raw, translated_raw):
+            value = _text(translated_value) or _text(original_value)
+            if value:
+                resolved.append(value)
+        if len(resolved) == len(original_values):
+            return resolved
+
+    if not original_values:
+        return [_text(v) for v in translated_raw if _text(v)]
+
+    return original_values
 
 
 def _skill_entries(result_payload):
@@ -493,6 +503,81 @@ def _non_skill_proficiency_rows(result_payload, pb):
     return tools, profs
 
 
+def _source_non_skill_integrity(result_payload, tools, other_proficiencies):
+    original = _original_character(result_payload)
+
+    expected_tools = set()
+    expected_other = set()
+    for entry in _list(original.get("proficiency_entries")):
+        entry = _dict(entry)
+        category = _classify_non_skill_entry(entry)
+        if not category:
+            continue
+        key = _entry_key(entry)
+        if not key or key.startswith("choose_a_"):
+            continue
+        if category == "TOOL":
+            expected_tools.add(key)
+        else:
+            expected_other.add((category, key))
+
+    actual_tools = {
+        _text(row.get("key"))
+        for row in _list(tools)
+        if _text(row.get("key"))
+    }
+    actual_other = {
+        (_text(row.get("prof_type")), _text(row.get("key")))
+        for row in _list(other_proficiencies)
+        if _text(row.get("prof_type")) != "LANGUAGE"
+        and _text(row.get("key"))
+    }
+
+    expected_languages = sorted(_translated_languages(result_payload))
+    actual_languages = sorted(
+        _text(row.get("name"))
+        for row in _list(other_proficiencies)
+        if _text(row.get("prof_type")) == "LANGUAGE"
+        and _text(row.get("name"))
+    )
+
+    mismatches = []
+    if expected_tools != actual_tools:
+        mismatches.append({
+            "kind": "tools",
+            "expected": sorted(expected_tools),
+            "actual": sorted(actual_tools),
+        })
+    if expected_other != actual_other:
+        mismatches.append({
+            "kind": "non_skill_proficiencies",
+            "expected": sorted([list(value) for value in expected_other]),
+            "actual": sorted([list(value) for value in actual_other]),
+        })
+    if expected_languages != actual_languages:
+        mismatches.append({
+            "kind": "languages",
+            "expected": expected_languages,
+            "actual": actual_languages,
+        })
+
+    if mismatches:
+        raise RuntimeError(
+            "11단계 D&D Beyond 숙련/언어 source→plan 무결성 실패: "
+            + json.dumps(mismatches, ensure_ascii=False)
+        )
+
+    return {
+        "status": "pass",
+        "source_language_count": len(expected_languages),
+        "planned_language_count": len(actual_languages),
+        "source_tool_count": len(expected_tools),
+        "planned_tool_count": len(actual_tools),
+        "source_other_proficiency_count": len(expected_other),
+        "planned_other_proficiency_count": len(actual_other),
+    }
+
+
 def build_proficiency_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
     roll20_payload = _dict(_dict(result_payload).get("roll20_payload"))
     character = _roll20_character(result_payload)
@@ -555,6 +640,11 @@ def build_proficiency_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
         result_payload,
         pb,
     )
+    source_integrity = _source_non_skill_integrity(
+        result_payload,
+        tools,
+        other_proficiencies,
+    )
 
     return {
         "version": STAGE11_VERSION,
@@ -565,6 +655,7 @@ def build_proficiency_plan(result_payload: dict[str, Any]) -> dict[str, Any]:
         "saves": saves,
         "tools": tools,
         "other_proficiencies": other_proficiencies,
+        "source_integrity": source_integrity,
         "skill_proficiency_count": sum(1 for row in skills if row["proficient"]),
         "expertise_count": sum(1 for row in skills if row["expertise"]),
         "save_proficiency_count": sum(1 for row in saves if row["proficient"]),

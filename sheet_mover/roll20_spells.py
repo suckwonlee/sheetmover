@@ -42,7 +42,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE7_VERSION = "2026-10-07-stage7-roll20-spells-v2.1-grouped-source-damage"
+STAGE7_VERSION = "2026-10-08-stage7-roll20-spells-v2.2-subclass-grants"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -162,6 +162,18 @@ def _raw_spell_definitions(result_payload):
             add_spells(entries)
     else:
         add_spells(grouped)
+
+    # Feature-table fallback spells do not exist as character spell objects in
+    # raw_source. Their exact DDB catalog definitions are preserved by the
+    # source resolver under calculation_inputs for Stage 7 combat mapping.
+    original = _dict(_dict(result_payload).get("original"))
+    calculation_inputs = _dict(original.get("calculation_inputs"))
+    resolution = _dict(calculation_inputs.get("subclass_spell_resolution"))
+    for source_id, definition in _dict(resolution.get("resolved_definitions")).items():
+        source_id = _text(source_id)
+        definition = _dict(definition)
+        if source_id and definition and source_id not in out:
+            out[source_id] = definition
 
     return out
 
@@ -597,6 +609,14 @@ def map_spell_row(
         "source_key": source_key,
         "source_id": _text(item.get("source_id")),
         "definition_id": _text(item.get("definition_id")),
+        "source_group": _text(item.get("source_group")),
+        "character_class_id": _text(item.get("character_class_id")),
+        "component_id": _text(item.get("component_id")),
+        "component_type_id": _text(item.get("component_type_id")),
+        "definition_is_legacy": item.get("definition_is_legacy"),
+        "grant_type": _text(item.get("grant_type")),
+        "grant_feature_id": _text(item.get("grant_feature_id")),
+        "grant_feature_name": _text(item.get("grant_feature_name")),
         "level": level,
         "section": section,
         "row_id": row_id,

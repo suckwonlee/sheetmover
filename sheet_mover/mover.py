@@ -124,7 +124,7 @@ class SheetMover:
         self.cdp_url = cdp_url  # stage 4부터 사용
         self.report = on_progress or (lambda percent, message: None)
 
-    async def prepare(self, raw_source=None):
+    async def prepare(self, raw_source=None, translation_seed_path=None):
         self.report(5, "D&D Beyond 링크를 확인합니다.")
         if raw_source is None:
             self.report(15, "D&D Beyond 원본 데이터를 수집합니다.")
@@ -142,6 +142,16 @@ class SheetMover:
             f"원본 확인: {original.name}. 텍스트 번역을 시작합니다.",
         )
         translator = Translator()
+        if translation_seed_path:
+            from .update_mode import prime_translator_from_previous_result
+
+            seed_report = prime_translator_from_previous_result(
+                translator,
+                translation_seed_path,
+                original.to_dict(),
+            )
+            seeded = int(seed_report.get("inserted_count") or 0)
+            self.report(35, f"기존 검증 번역 {seeded}개 재사용 준비")
         try:
             translated = await asyncio.to_thread(
                 translator.translate_character,
@@ -244,11 +254,20 @@ class SheetMover:
 BrowserMover = SheetMover
 
 
-def run(source_url=SOURCE_URL, cdp_url=None, on_progress=None, raw_source=None):
+def run(
+    source_url=SOURCE_URL,
+    cdp_url=None,
+    on_progress=None,
+    raw_source=None,
+    translation_seed_path=None,
+):
     return asyncio.run(
         SheetMover(
             source_url,
             cdp_url,
             on_progress,
-        ).prepare(raw_source=raw_source)
+        ).prepare(
+            raw_source=raw_source,
+            translation_seed_path=translation_seed_path,
+        )
     )

@@ -91,7 +91,9 @@ _SPELL_FIELDS = (
     "school", "ritual", "concentration", "save_dc_ability_id", "attack_type",
     "damage_effect", "counts_as_known_spell", "spellcasting_ability_id",
     "cast_only_as_ritual", "ritual_casting_type", "restriction",
-    "display_as_attack",
+    "display_as_attack", "source_group", "character_class_id", "component_id",
+    "component_type_id", "definition_is_legacy", "grant_type",
+    "grant_feature_id", "grant_feature_name",
 )
 
 _FEATURE_FIELDS = (

@@ -220,12 +220,34 @@ def _normalize_inventory_item(entry, kind="equipment"):
     return item
 
 
-def _normalize_spell(entry, source_kind="spell"):
+def _structured_spell_grant_type(entry):
+    if not isinstance(entry, dict):
+        return "structured"
+    if entry.get("alwaysPrepared") is True:
+        return "always_prepared"
+    if entry.get("countsAsKnownSpell") is True:
+        return "known"
+    if entry.get("prepared") is True:
+        return "prepared"
+    return "structured"
+
+
+def _normalize_spell(
+    entry,
+    source_kind="spell",
+    *,
+    source_group="",
+    character_class_id="",
+):
     item = _definition(entry, source_kind)
     if not item:
         return None
 
     definition = _dict(entry.get("definition"))
+    legacy = definition.get("isLegacy")
+    if not isinstance(legacy, bool):
+        legacy = None
+
     item.update(
         level=definition.get("level"),
         prepared=entry.get("prepared"),
@@ -248,6 +270,12 @@ def _normalize_spell(entry, source_kind="spell"):
         ritual_casting_type=entry.get("ritualCastingType"),
         restriction=entry.get("restriction"),
         display_as_attack=entry.get("displayAsAttack"),
+        source_group=str(source_group or ""),
+        character_class_id=str(character_class_id or ""),
+        component_id=str(entry.get("componentId") or ""),
+        component_type_id=str(entry.get("componentTypeId") or ""),
+        definition_is_legacy=legacy,
+        grant_type=_structured_spell_grant_type(entry),
     )
     return item
 
@@ -817,15 +845,25 @@ def normalize_character(data):
         if item:
             sheet.equipment.append(item)
 
-    spell_groups = list(_dict(data.get("spells")).values())
-    spell_groups += [
-        _list(character_class.get("spells"))
-        for character_class in _list(data.get("classSpells"))
-        if isinstance(character_class, dict)
-    ]
-    for group in spell_groups:
+    for group_name, group in _dict(data.get("spells")).items():
         for entry in _list(group):
-            item = _normalize_spell(entry)
+            item = _normalize_spell(
+                entry,
+                source_group=str(group_name or ""),
+            )
+            if item:
+                sheet.spells.append(item)
+
+    for class_spell_group in _list(data.get("classSpells")):
+        if not isinstance(class_spell_group, dict):
+            continue
+        character_class_id = class_spell_group.get("characterClassId")
+        for entry in _list(class_spell_group.get("spells")):
+            item = _normalize_spell(
+                entry,
+                source_group="classSpells",
+                character_class_id=character_class_id,
+            )
             if item:
                 sheet.spells.append(item)
 
@@ -1059,3 +1097,7 @@ normalize_character = _install_source_integrity_v262(normalize_character)
 # runtime-integrity-v2.6.3 selected-option hook
 from .runtime_integrity_v263 import install_source_integrity as _install_source_integrity_v263
 normalize_character = _install_source_integrity_v263(normalize_character)
+
+# subclass-spells-v2.6.4 source hook
+from .subclass_spells import install_source_integrity as _install_subclass_spells_v264
+normalize_character = _install_subclass_spells_v264(normalize_character)

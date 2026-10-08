@@ -87,6 +87,7 @@ class SheetMoverUI(tk.Tk):
         }
 
         self.source_var = tk.StringVar(value=source_url)
+        self.update_existing_var = tk.BooleanVar(value=False)
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_text = tk.StringVar(value="준비 상태를 확인하세요.")
 
@@ -233,6 +234,21 @@ class SheetMoverUI(tk.Tk):
             text="Roll20에는 동일한 이름의 대상 캐릭터가 미리 있어야 합니다.",
             style="Muted.TLabel",
         ).pack(anchor="w", pady=(8, 0))
+        ttk.Checkbutton(
+            left,
+            text="기존 시트 이동 결과를 기준으로 변경사항 업데이트",
+            variable=self.update_existing_var,
+        ).pack(anchor="w", pady=(12, 0))
+        ttk.Label(
+            left,
+            text=(
+                "체크 시 같은 D&D Beyond 캐릭터의 이전 결과와 비교하고, "
+                "검증된 동일 원문 번역은 재사용합니다."
+            ),
+            style="Muted.TLabel",
+            wraplength=430,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
 
         ttk.Label(right, text="실행 환경", style="CardTitle.TLabel").pack(anchor="w")
         self._status_row(right, "Google Cloud", self.google_status)
@@ -470,7 +486,7 @@ class SheetMoverUI(tk.Tk):
 
     def _worker_command(self, settings_file=None):
         if getattr(sys, "frozen", False):
-            return [
+            command = [
                 sys.executable,
                 "--worker-full-run",
                 "--source",
@@ -478,15 +494,25 @@ class SheetMoverUI(tk.Tk):
                 "--settings",
                 str(settings_file or settings_path()),
             ]
-        return [
-            sys.executable,
-            "-m",
-            "sheet_mover.full_run",
-            "--source",
-            self.source_var.get().strip(),
-            "--settings",
-            str(settings_file or settings_path()),
-        ]
+        else:
+            command = [
+                sys.executable,
+                "-m",
+                "sheet_mover.full_run",
+                "--source",
+                self.source_var.get().strip(),
+                "--settings",
+                str(settings_file or settings_path()),
+            ]
+
+        update_var = getattr(self, "update_existing_var", None)
+        try:
+            update_existing = bool(update_var.get()) if update_var is not None else False
+        except Exception:
+            update_existing = False
+        if update_existing:
+            command.append("--update-existing")
+        return command
 
     def start_full_run(self):
         if self.running:

@@ -241,6 +241,7 @@ def install_single_current_log(original_run_full_move):
         *,
         emit=None,
         run_id=None,
+        update_existing=False,
     ):
         from .app_config import data_dir
 
@@ -255,12 +256,21 @@ def install_single_current_log(original_run_full_move):
             actual_emit(event)
 
         try:
-            state = original_run_full_move(
-                source_url,
-                settings,
-                emit=proxy_emit,
-                run_id=run_id,
-            )
+            if update_existing:
+                state = original_run_full_move(
+                    source_url,
+                    settings,
+                    emit=proxy_emit,
+                    run_id=run_id,
+                    update_existing=True,
+                )
+            else:
+                state = original_run_full_move(
+                    source_url,
+                    settings,
+                    emit=proxy_emit,
+                    run_id=run_id,
+                )
         except Exception as exc:
             failure_state = getattr(exc, "failure_report", None)
             if not isinstance(failure_state, dict):
