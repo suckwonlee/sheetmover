@@ -41,7 +41,7 @@ from .roll20_inventory import (
 )
 
 
-STAGE12_VERSION = "2026-10-07-stage12-roll20-resources-v1.3-ability-modifier-uses"
+STAGE12_VERSION = "2026-10-08-stage12-roll20-resources-v1.4-dynamic-uses"
 ROW_PREFIX = "-SM"
 ROW_HASH_LENGTH = 17
 
@@ -85,10 +85,40 @@ def _resource_values(result_payload):
     translated = _dict(_dict(result_payload).get("translated"))
     original = _dict(_dict(result_payload).get("original"))
 
-    values = _list(translated.get("resources"))
-    if values:
-        return values
-    return _list(original.get("resources"))
+    translated_values = _list(translated.get("resources"))
+    original_values = _list(original.get("resources"))
+
+    if not translated_values:
+        return original_values
+    if not original_values:
+        return translated_values
+
+    merged = list(translated_values)
+    seen = set()
+
+    for item in translated_values:
+        item = _dict(item)
+        seen.add(
+            (
+                _text(item.get("source_id")),
+                _text(item.get("kind")),
+                _text(item.get("original_name") or item.get("name")),
+            )
+        )
+
+    for item in original_values:
+        item = _dict(item)
+        identity = (
+            _text(item.get("source_id")),
+            _text(item.get("kind")),
+            _text(item.get("original_name") or item.get("name")),
+        )
+        if identity in seen:
+            continue
+        seen.add(identity)
+        merged.append(item)
+
+    return merged
 
 
 def _resource_source_key(item, index):
@@ -117,27 +147,56 @@ STAT_ID_TO_ABILITY = {
 
 
 def _ability_modifier(score):
-    score = _as_int(score, 10)
-    return (score - 10) // 2
+    if type(score) not in (int, float):
+        return None
+    return (int(score) - 10) // 2
 
 
 def _max_uses(limited_use, proficiency_bonus, ability_scores=None):
     limited_use = _dict(limited_use)
     ability_scores = _dict(ability_scores)
-    raw_max = limited_use.get("maxUses")
 
-    if raw_max not in (None, ""):
-        maximum = _as_int(raw_max, 0)
-        if maximum > 0:
-            return maximum
+    raw_max = limited_use.get("maxUses")
+    base = (
+        _as_int(raw_max, 0)
+        if raw_max not in (None, "")
+        else 0
+    )
+
+    dynamic = False
 
     stat_id = _as_int(limited_use.get("statModifierUsesId"), 0)
     ability = STAT_ID_TO_ABILITY.get(stat_id)
-    if ability and ability in ability_scores:
-        return max(1, _ability_modifier(ability_scores.get(ability)))
+    if ability:
+        dynamic = True
+        modifier = _ability_modifier(ability_scores.get(ability))
+        operator = limited_use.get("operator")
+        if modifier is None:
+            return 0
+        if operator == 1:
+            base += modifier
+        elif operator in (None, "") and raw_max in (None, "", 0):
+            # Backward-compatible DDB shape: a stat modifier with no explicit
+            # operator and no fixed base meant "ability modifier uses".
+            base += modifier
+        else:
+            return 0
 
     if limited_use.get("useProficiencyBonus") is True:
-        return max(0, _as_int(proficiency_bonus, 0))
+        dynamic = True
+        pb_operator = limited_use.get("proficiencyBonusOperator")
+        if pb_operator not in (None, "", 1):
+            return 0
+        pb = _as_int(proficiency_bonus, -1)
+        if pb < 0:
+            return 0
+        base += pb
+
+    if dynamic:
+        return max(0, base)
+
+    if raw_max not in (None, ""):
+        return max(0, base)
 
     return 0
 
@@ -265,10 +324,17 @@ def _slot_blank(snapshot, prefix):
 
 
 def _previous_report(output_path):
-    if not output_path.is_file():
-        return {}
+    if output_path.is_file():
+        try:
+            return json.loads(output_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
     try:
-        return json.loads(output_path.read_text(encoding="utf-8"))
+        from .run_log import previous_stage_report
+        return previous_stage_report(
+            output_path.parent,
+            "resources",
+        )
     except Exception:
         return {}
 

@@ -1055,3 +1055,7 @@ def normalize_character(data):
 # runtime-integrity-v2.6.2 source hook
 from .runtime_integrity_v262 import install_source_integrity as _install_source_integrity_v262
 normalize_character = _install_source_integrity_v262(normalize_character)
+
+# runtime-integrity-v2.6.3 selected-option hook
+from .runtime_integrity_v263 import install_source_integrity as _install_source_integrity_v263
+normalize_character = _install_source_integrity_v263(normalize_character)

@@ -692,12 +692,20 @@ def managed_repeating_rows(plan):
 
 
 def _previous_managed_rows(output_path):
-    if not output_path.is_file():
-        return {"tool": [], "proficiencies": []}
-    try:
-        previous = json.loads(output_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {"tool": [], "proficiencies": []}
+    if output_path.is_file():
+        try:
+            previous = json.loads(output_path.read_text(encoding="utf-8"))
+        except Exception:
+            previous = {}
+    else:
+        try:
+            from .run_log import previous_stage_report
+            previous = previous_stage_report(
+                output_path.parent,
+                "proficiencies",
+            )
+        except Exception:
+            previous = {}
     rows = _dict(previous.get("managed_repeating_rows"))
     return {
         "tool": [_text(v) for v in _list(rows.get("tool")) if _text(v)],

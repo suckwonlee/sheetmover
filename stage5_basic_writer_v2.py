@@ -31,7 +31,7 @@ from sheet_mover.roll20_connection import (
     _select_roll20_tab,
 )
 
-VERSION = "2026-10-06-stage5-basic-fields-v2.1-multiclass"
+VERSION = "2026-10-08-stage5-basic-fields-v3.1-correctness"
 ROOT = Path.cwd()
 
 ABILITY_NAMES = (
@@ -76,10 +76,16 @@ STAGE5_NAMES = {
     "arcane_fighter",
     "arcane_rogue",
     "race",
+    "race_display",
     "subrace",
     "background",
     "alignment",
     "experience",
+    "cp",
+    "sp",
+    "ep",
+    "gp",
+    "pp",
     "strength_base",
     "dexterity_base",
     "constitution_base",
@@ -110,7 +116,11 @@ STAGE5_NAMES = {
     "spell_attack_mod",
     "spell_save_dc",
     "spell_attack_bonus",
+    "spellclass",
     "caster_level",
+    "hit_dice",
+    "hit_dice_max",
+    "passiveperceptionmod",
 }
 
 # hp is special: Roll20 stores current/max on ONE attribute named "hp".
@@ -192,6 +202,117 @@ def _walk_speed(speed):
     if isinstance(normal, dict) and normal.get("walk") is not None:
         return normal.get("walk")
     return speed.get("walk")
+
+
+# stage5-correctness-v3.1
+def _source_classes_for_hit_dice(payload, character):
+    original = _dict(_dict(payload).get("original"))
+    rows = [
+        row for row in _list(original.get("classes"))
+        if isinstance(row, dict)
+    ]
+    if rows:
+        return rows
+    return [
+        row for row in _list(character.get("classes"))
+        if isinstance(row, dict)
+    ]
+
+
+def _hit_dice_values(payload, character):
+    rows = _source_classes_for_hit_dice(payload, character)
+    if not rows:
+        return None
+
+    die_types = set()
+    total = 0
+    remaining = 0
+
+    for row in rows:
+        level = row.get("level")
+        hit_die = row.get("hit_die")
+        used = row.get("hit_dice_used")
+
+        if (
+            type(level) is not int
+            or level < 1
+            or type(hit_die) is not int
+            or hit_die < 1
+            or type(used) is not int
+            or used < 0
+            or used > level
+        ):
+            return None
+
+        die_types.add(hit_die)
+        total += level
+        remaining += level - used
+
+    if len(die_types) != 1:
+        return None
+
+    return remaining, total
+
+
+def _item_effect_active(item):
+    item = _dict(item)
+    equipped = item.get("equipped") is True
+    attuned = item.get("attuned") is True
+    can_equip = item.get("can_equip") is True
+    can_attune = item.get("can_attune") is True
+    consumable = item.get("is_consumable") is True
+
+    return (
+        (not can_equip and not can_attune and not consumable)
+        or (attuned and equipped)
+        or (attuned and not can_equip)
+        or (not can_attune and equipped)
+    )
+
+
+def _passive_perception_item_bonus(payload):
+    original = _dict(_dict(payload).get("original"))
+    seen = False
+    total = 0
+
+    for item in _list(original.get("equipment")):
+        if not isinstance(item, dict) or not _item_effect_active(item):
+            continue
+
+        for modifier in _list(item.get("granted_modifiers")):
+            modifier = _dict(modifier)
+            if (
+                _text(modifier.get("type")).casefold() != "bonus"
+                or _text(modifier.get("subType")).casefold()
+                != "passive-perception"
+            ):
+                continue
+
+            seen = True
+            if _text(modifier.get("restriction")):
+                return None
+
+            value = modifier.get("value")
+            if _number(value) is None:
+                value = modifier.get("fixedValue")
+            if _number(value) is None:
+                return None
+
+            total += value
+
+    return total if seen else None
+
+
+def _spellclass_name(character):
+    spellcasting = _dict(character.get("spellcasting"))
+    names = {
+        _text(row.get("class_name"))
+        for row in _list(spellcasting.get("class_calculations"))
+        if isinstance(row, dict) and _text(row.get("class_name"))
+    }
+    if len(names) == 1:
+        return next(iter(names))
+    return None
 
 
 def _spell_ability(character, cls):
@@ -313,8 +434,11 @@ def build_plan(payload: dict[str, Any]):
     put("subclass", subclass)
 
     display_parts = [
-        f"{subclass} {class_name} {level}"
-        if subclass else f"{class_name} {level}"
+        (
+            f"{class_name} {level} / {subclass}"
+            if subclass
+            else f"{class_name} {level}"
+        )
     ]
 
     secondary = classes[1:]
@@ -346,11 +470,14 @@ def build_plan(payload: dict[str, Any]):
         put(f"{prefix}_subclass", multi_subclass)
 
         display_parts.append(
-            f"{multi_subclass} {multi_name} {multi_level}"
-            if multi_subclass else f"{multi_name} {multi_level}"
+            (
+                f"{multi_name} {multi_level} / {multi_subclass}"
+                if multi_subclass
+                else f"{multi_name} {multi_level}"
+            )
         )
 
-    put("class_display", ", ".join(display_parts))
+    put("class_display", " | ".join(display_parts))
     put("arcane_fighter", 1 if _is_arcane_fighter(classes) else 0)
     put("arcane_rogue", 1 if _is_arcane_rogue(classes) else 0)
 
@@ -358,6 +485,7 @@ def build_plan(payload: dict[str, Any]):
     race_name = _display_name(race)
     if race_name:
         put("race", race_name)
+        put("race_display", race_name)
     if _text(race.get("subrace_name")):
         put("subrace", _text(race.get("subrace_name")))
 
@@ -371,6 +499,22 @@ def build_plan(payload: dict[str, Any]):
 
     if _number(character.get("experience")) is not None:
         put("experience", character.get("experience"))
+
+    currencies = _dict(character.get("currencies"))
+    for currency in ("cp", "sp", "ep", "gp", "pp"):
+        value = currencies.get(currency)
+        if _number(value) is not None:
+            put(currency, value)
+
+    hit_dice = _hit_dice_values(payload, character)
+    if hit_dice is not None:
+        remaining_hit_dice, total_hit_dice = hit_dice
+        put("hit_dice", remaining_hit_dice)
+        put("hit_dice_max", total_hit_dice)
+
+    passive_bonus = _passive_perception_item_bonus(payload)
+    if _number(passive_bonus) is not None:
+        put("passiveperceptionmod", passive_bonus)
 
     scores = _dict(character.get("ability_scores"))
     for ability in ABILITY_NAMES:
@@ -429,6 +573,10 @@ def build_plan(payload: dict[str, Any]):
                 put("globalmagicmod", attack_delta)
                 put("spell_attack_mod", attack_delta)
                 put("spell_attack_bonus", final_attack)
+
+    spellclass = _spellclass_name(character)
+    if spellclass:
+        put("spellclass", spellclass)
 
     put("caster_level", _caster_level_for_classes(classes))
 

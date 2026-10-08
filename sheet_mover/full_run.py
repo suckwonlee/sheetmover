@@ -57,16 +57,25 @@ def _stable_json(value):
 
 def _find_reusable_result(source_id: str, raw_source: dict):
     # Reuse only a result produced from the exact same D&D Beyond raw payload.
-    folder = data_dir() / "results" / "current"
-    if not folder.is_dir():
-        return None, None
+    # results/current is reserved for one consolidated execution log.
+    folders = [
+        data_dir() / "results" / "cache",
+        data_dir() / "results" / "current",
+    ]
 
     wanted_raw = _stable_json(raw_source)
     if not wanted_raw:
         return None, None
 
+    candidates = []
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        candidates.extend(
+            folder.glob(f"sheet-result-{source_id}-*.json")
+        )
     candidates = sorted(
-        folder.glob(f"sheet-result-{source_id}-*.json"),
+        candidates,
         key=lambda path: path.name,
         reverse=True,
     )
@@ -603,6 +612,10 @@ def cli_main(argv=None):
 # runtime-integrity-v2.6.2 cache-refresh hook
 from .runtime_integrity_v262 import install_reusable_result_refresh as _install_reusable_result_refresh_v262
 _find_reusable_result = _install_reusable_result_refresh_v262(_find_reusable_result)
+
+# single-current-log-v1
+from .run_log import install_single_current_log as _install_single_current_log_v1
+run_full_move = _install_single_current_log_v1(run_full_move)
 
 if __name__ == "__main__":
     raise SystemExit(cli_main())

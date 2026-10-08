@@ -120,7 +120,10 @@ def iter_result_candidates(
         legacy_root = data_root
 
     seen: set[Path] = set()
-    folders = [data_root / "results" / "current"]
+    folders = [
+        data_root / "results" / "cache",
+        data_root / "results" / "current",
+    ]
 
     # Backward compatibility for the source checkout layout.
     if include_legacy_root:
